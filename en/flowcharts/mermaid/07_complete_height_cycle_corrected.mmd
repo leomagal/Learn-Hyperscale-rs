@@ -1,0 +1,57 @@
+graph TD
+    A["🚀 Epoch Start<br/>Height = 0, Round = 0"] --> B["👑 Leader Election<br/>Leader = Validator[Height % N]"]
+    B --> C["📝 Propose Block<br/>Block(Height, Round, Txs)"]
+    C --> D["📥 Nodes Receive"]
+    D --> E["✅ Validate Block"]
+    
+    E -->|Invalid| F["❌ Reject"]
+    F --> G["⏱️ Timeout"]
+    
+    E -->|Valid| H["🔒 Check Vote Lock<br/>voted_heights[Height]?"]
+    
+    H -->|Locked| I["🚫 Cannot Vote<br/>Already locked"]
+    I --> G
+    
+    H -->|Not Locked| J["🗳️ Vote on Block"]
+    J --> K["📊 Collect Votes"]
+    K --> L{"2f+1 Votes?"}
+    
+    L -->|No| M["⏱️ Timeout"]
+    M --> N["🔄 View Change<br/>Round += 1"]
+    N --> O["🔓 Unlock Votes<br/>Remove all locks"]
+    O --> B
+    
+    L -->|Yes| P["✍️ Aggregate Signatures<br/>BLS12-381"]
+    P --> Q["🎖️ Create QC<br/>QC(Height, Round)"]
+    Q --> R["📡 Broadcast QC"]
+    
+    R --> S["📥 Receive QC"]
+    S --> T["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
+    T --> U["🔓 Unlock Votes<br/>Remove locks ≤ QC.height"]
+    
+    U --> V{"Two-Chain Rule?<br/>Parent QC exists?"}
+    
+    V -->|No| W["⏳ Wait for Next QC"]
+    W --> N
+    
+    V -->|Yes| X["✅ Commit Block"]
+    X --> Y["⚙️ Execute Transactions"]
+    Y --> Z["💾 Update State Root"]
+    
+    Z --> AA{"Epoch End?<br/>Height >= Threshold"}
+    
+    AA -->|No| AB["➕ Next Height<br/>Height += 1<br/>Round = 0"]
+    AB --> B
+    
+    AA -->|Yes| AC["🎉 New Epoch<br/>Height += 1<br/>Round = 0"]
+    AC --> A
+    
+    G --> AD["⏱️ View Change Timer<br/>Timeout X seconds"]
+    AD --> N
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style X fill:#51cf66,stroke:#2f9e44,color:#fff
+    style Q fill:#4dabf7,stroke:#1971c2,color:#fff
+    style T fill:#ffd43b,stroke:#f59f00,color:#000
+    style U fill:#ffd43b,stroke:#f59f00,color:#000
+    style H fill:#a78bfa,stroke:#7c3aed,color:#fff

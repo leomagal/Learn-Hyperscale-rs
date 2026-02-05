@@ -1,0 +1,65 @@
+graph LR
+    subgraph "Phase 1: Reception & Validation"
+        A["📥 Transaction Received<br/>from Client"]
+        B["✅ Basic Validation<br/>- Signature<br/>- Format<br/>- Nonce"]
+    end
+    
+    subgraph "Phase 2: Mempool Processing"
+        C["📊 Dependency Analysis<br/>DependencyGraph"]
+        D{"Conflict<br/>Detected?"}
+        E["🟢 Ready State<br/>No conflicts"]
+        F["🔴 Deferred State<br/>Waiting for dependency"]
+    end
+    
+    subgraph "Phase 3: Block Inclusion"
+        G["📋 Categorize Transaction<br/>1. Retry (failed before)<br/>2. Priority (CommitmentProof)<br/>3. Normal"]
+        H["🔗 Propose in Block<br/>Order: Retry → Priority → Normal"]
+    end
+    
+    subgraph "Phase 4: Consensus"
+        I["🗳️ Nodes Vote on Block"]
+        J["🎖️ QC Created<br/>2f+1 Consensus"]
+    end
+    
+    subgraph "Phase 5: Execution"
+        K["✅ Block Committed<br/>Two-chain rule"]
+        L["⚙️ Execute Transaction<br/>Update State"]
+        M["🟢 Executed State<br/>Success"]
+    end
+    
+    subgraph "Phase 6: Finalization"
+        N["💾 Update Mempool<br/>Remove executed"]
+        O["🏁 Transaction Complete"]
+    end
+    
+    A --> B
+    B -->|Invalid| P["❌ Reject<br/>Discard"]
+    P --> O
+    
+    B -->|Valid| C
+    C --> D
+    D -->|No Conflict| E
+    D -->|Conflict| F
+    
+    E --> G
+    F --> Q["⏳ Wait for Dependency<br/>Retry later"]
+    Q --> E
+    
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
+    L -->|Success| M
+    L -->|Failure| R["🔴 Aborted State<br/>Conflict/Error"]
+    R --> N
+    
+    M --> N
+    N --> O
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style E fill:#51cf66,stroke:#2f9e44,color:#fff
+    style F fill:#ffd43b,stroke:#f59f00,color:#000
+    style H fill:#4dabf7,stroke:#1971c2,color:#fff
+    style M fill:#51cf66,stroke:#2f9e44,color:#fff
+    style R fill:#ff8787,stroke:#fa5252,color:#fff

@@ -1,0 +1,50 @@
+graph TD
+    A["🚀 Cross-Shard Transaction<br/>Spans Multiple Shards"] --> B["📋 Identify Shards<br/>Source & Destination"]
+    B --> C["🔗 Shard 1: Source<br/>Prepare Phase"]
+    
+    C --> D["✅ Validate Transaction<br/>- Signature<br/>- Sufficient Balance"]
+    D -->|Invalid| E["❌ Reject"]
+    E --> F["🏁 End"]
+    
+    D -->|Valid| G["⚙️ Execute Source<br/>- Deduct Balance<br/>- Create CommitmentProof"]
+    G --> H["📜 CommitmentProof<br/>Cryptographic proof of execution"]
+    
+    H --> I["📤 Send CommitmentProof<br/>to Destination Shard"]
+    I --> J["🔗 Shard 2: Destination<br/>Commit Phase"]
+    
+    J --> K["📥 Receive CommitmentProof"]
+    K --> L["✅ Verify CommitmentProof<br/>- Signature valid?<br/>- Source executed?"]
+    
+    L -->|Invalid| M["❌ Reject<br/>Invalid proof"]
+    M --> N["🔄 Rollback Source<br/>Refund balance"]
+    N --> F
+    
+    L -->|Valid| O["📋 Categorize in Block<br/>Priority Transaction<br/>(has CommitmentProof)"]
+    O --> P["🟢 Ready State<br/>Included in block"]
+    
+    P --> Q["🗳️ Consensus<br/>Nodes vote on block"]
+    Q --> R["🎖️ QC Created<br/>2f+1 consensus"]
+    
+    R --> S["✅ Block Committed<br/>Two-chain rule"]
+    S --> T["⚙️ Execute Destination<br/>- Add Balance<br/>- Finalize"]
+    
+    T --> U{"Execution<br/>Success?"}
+    
+    U -->|Yes| V["✅ Transaction Finalized<br/>Both shards updated"]
+    U -->|No| W["🔄 Rollback<br/>Revert both shards"]
+    
+    V --> X["💾 Update State Root<br/>Both shards"]
+    W --> X
+    
+    X --> Y["📋 Update Mempool<br/>Remove from pending"]
+    Y --> F
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style C fill:#4dabf7,stroke:#1971c2,color:#fff
+    style J fill:#4dabf7,stroke:#1971c2,color:#fff
+    style G fill:#51cf66,stroke:#2f9e44,color:#fff
+    style H fill:#ffd43b,stroke:#f59f00,color:#000
+    style O fill:#51cf66,stroke:#2f9e44,color:#fff
+    style T fill:#51cf66,stroke:#2f9e44,color:#fff
+    style V fill:#51cf66,stroke:#2f9e44,color:#fff
+    style W fill:#ff8787,stroke:#fa5252,color:#fff

@@ -1,0 +1,2276 @@
+diff --git a/en/flowcharts/images/01_general_architecture_improved.png b/en/flowcharts/images/01_general_architecture_improved.png
+new file mode 100644
+index 0000000..bfdd5d8
+Binary files /dev/null and b/en/flowcharts/images/01_general_architecture_improved.png differ
+diff --git a/en/flowcharts/images/02_bft_consensus_cycle_corrected.png b/en/flowcharts/images/02_bft_consensus_cycle_corrected.png
+new file mode 100644
+index 0000000..c61ace9
+Binary files /dev/null and b/en/flowcharts/images/02_bft_consensus_cycle_corrected.png differ
+diff --git a/en/flowcharts/images/03_transaction_flow_improved.png b/en/flowcharts/images/03_transaction_flow_improved.png
+new file mode 100644
+index 0000000..1cf22fe
+Binary files /dev/null and b/en/flowcharts/images/03_transaction_flow_improved.png differ
+diff --git a/en/flowcharts/images/04_cross_shard_transaction_flow_improved.png b/en/flowcharts/images/04_cross_shard_transaction_flow_improved.png
+new file mode 100644
+index 0000000..baf7629
+Binary files /dev/null and b/en/flowcharts/images/04_cross_shard_transaction_flow_improved.png differ
+diff --git a/en/flowcharts/images/04_node_state_machine.png b/en/flowcharts/images/04_node_state_machine.png
+new file mode 100644
+index 0000000..3a3f9eb
+Binary files /dev/null and b/en/flowcharts/images/04_node_state_machine.png differ
+diff --git a/en/flowcharts/images/05_voting_qc_cycle_improved.png b/en/flowcharts/images/05_voting_qc_cycle_improved.png
+new file mode 100644
+index 0000000..067b8e5
+Binary files /dev/null and b/en/flowcharts/images/05_voting_qc_cycle_improved.png differ
+diff --git a/en/flowcharts/images/06_distributed_execution_improved.png b/en/flowcharts/images/06_distributed_execution_improved.png
+new file mode 100644
+index 0000000..e67abc2
+Binary files /dev/null and b/en/flowcharts/images/06_distributed_execution_improved.png differ
+diff --git a/en/flowcharts/images/07_complete_height_cycle_corrected.png b/en/flowcharts/images/07_complete_height_cycle_corrected.png
+new file mode 100644
+index 0000000..b464b71
+Binary files /dev/null and b/en/flowcharts/images/07_complete_height_cycle_corrected.png differ
+diff --git a/en/flowcharts/images/08_failure_handling_view_change.html b/en/flowcharts/images/08_failure_handling_view_change.html
+new file mode 100644
+index 0000000..52c6e52
+--- /dev/null
++++ b/en/flowcharts/images/08_failure_handling_view_change.html
+@@ -0,0 +1,119 @@
++<!DOCTYPE html>
++<html>
++<head>
++    <meta charset="UTF-8">
++    <title>Mermaid Renderer</title>
++    
++    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
++    <style>
++        body {
++            font-family: "Noto Sans CJK SC", "WenQuanYi Zen Hei", "SimSun", "Microsoft YaHei",
++                         "Arial Unicode MS", "Arial", sans-serif;
++            line-height: 1.6;
++            margin: 0;
++            background: white;
++            color: #333;
++        }
++         
++        .mermaid {
++            text-align: center;
++            margin: 1.5em 0;
++            page-break-inside: avoid;
++            background-color: transparent;
++        }
++        .mermaid svg {
++            max-width: 100%;
++            height: auto;
++        }
++    </style>
++</head>
++<body>
++    <div class="mermaid">graph TD
++    START[&#34;⏱️ Round Timeout&lt;br/&gt;Leader Does Not Propose&#34;] --&gt; DETECT[&#34;🚨 Detect Failure&lt;br/&gt;Waited X seconds&#34;]
++    
++    DETECT --&gt; UNLOCK[&#34;🔓 Unlock Vote&lt;br/&gt;Remove Vote Lock&#34;]
++    
++    UNLOCK --&gt; INCREASE_VIEW[&#34;📈 Increment View&lt;br/&gt;View &#43;= 1&lt;br/&gt;Round &#43;= 1&#34;]
++    
++    INCREASE_VIEW --&gt; NEW_LEADER[&#34;👑 New Leader&lt;br/&gt;Leader = Validator[Round % N]&#34;]
++    
++    NEW_LEADER --&gt; LEADER_CHECK{&#34;New Leader&lt;br/&gt;is Honest?&#34;}
++    
++    LEADER_CHECK --&gt;|No| TIMEOUT_AGAIN[&#34;⏱️ Timeout Again&lt;br/&gt;Repeat View Change&#34;]
++    TIMEOUT_AGAIN --&gt; INCREASE_VIEW
++    
++    LEADER_CHECK --&gt;|Yes| PROPOSE_NEW[&#34;📝 New Leader Proposes&lt;br/&gt;Block with HighQC&#34;]
++    
++    PROPOSE_NEW --&gt; SYNC[&#34;🔄 Synchronization&lt;br/&gt;Nodes Receive Proposal&#34;]
++    
++    SYNC --&gt; VALIDATE[&#34;✅ Validate Block&lt;br/&gt;- Valid Parent QC&lt;br/&gt;- Signature OK&#34;]
++    
++    VALIDATE --&gt;|Invalid| REJECT[&#34;❌ Rejects&lt;br/&gt;New Timeout&#34;]
++    REJECT --&gt; INCREASE_VIEW
++    
++    VALIDATE --&gt;|Valid| VOTE_NEW[&#34;🗳️ Vote on New Block&#34;]
++    
++    VOTE_NEW --&gt; COLLECT[&#34;📊 Collect Votes&lt;br/&gt;2f&#43;1 Required&#34;]
++    
++    COLLECT --&gt; QC_NEW[&#34;🎖️ QC Created&lt;br/&gt;System Recovered&#34;]
++    
++    QC_NEW --&gt; PROGRESS[&#34;✅ System Progresses&lt;br/&gt;Consensus Restored&#34;]
++    
++    PROGRESS --&gt; END[&#34;🏁 Back to Normal&#34;]
++    
++    style START fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style DETECT fill:#ffd43b,stroke:#f59f00,color:#000
++    style UNLOCK fill:#4c6ef5,stroke:#1971c2,color:#fff
++    style NEW_LEADER fill:#51cf66,stroke:#2f9e44,color:#fff
++    style QC_NEW fill:#da77f2,stroke:#9c36b5,color:#fff
++    style PROGRESS fill:#9c36b5,stroke:#6c2a8f,color:#fff
++</div>
++    <script>
++        
++        if (typeof mermaid !== 'undefined') {
++            mermaid.initialize({
++                startOnLoad: false,  
++                theme: 'default',
++                securityLevel: 'loose'
++            });
++        }
++
++        
++        document.addEventListener("DOMContentLoaded", async function() {
++            if (typeof mermaid === 'undefined') {
++                return;
++            }
++
++            const mermaidElements = document.querySelectorAll('.mermaid');
++            let hasError = false;
++
++            for (let i = 0; i < mermaidElements.length; i++) {
++                const element = mermaidElements[i];
++                const mermaidCode = element.textContent.trim();
++
++                try {
++                    const { svg } = await mermaid.render('mermaid-diagram-' + i, mermaidCode);
++                    element.innerHTML = svg;
++                    console.log('Mermaid diagram ' + (i + 1) + ' rendered successfully');
++                } catch (error) {
++                    hasError = true;
++                    console.error('Mermaid rendering error for diagram ' + (i + 1) + ':', error);
++
++                    
++                    element.innerHTML = '<div class="mermaid-error" style="color: red; border: 2px solid red; padding: 10px; border-radius: 5px; background: #ffeeee;">' +
++                        '<strong>Mermaid Rendering Error (Diagram ' + (i + 1) + '):</strong><br>' +
++                        '<code>' + error.message + '</code>' +
++                        '</div>';
++
++                    
++                    document.body.classList.add('mermaid-render-failed');
++                }
++            }
++
++            
++            window.mermaidRenderComplete = true;
++            window.mermaidHasError = hasError;
++        });
++    </script>
++</body>
++</html>
+diff --git a/en/flowcharts/images/08_failure_handling_view_change_corrected.png b/en/flowcharts/images/08_failure_handling_view_change_corrected.png
+new file mode 100644
+index 0000000..8190d8b
+Binary files /dev/null and b/en/flowcharts/images/08_failure_handling_view_change_corrected.png differ
+diff --git a/en/flowcharts/mermaid/01_general_architecture_improved.mmd b/en/flowcharts/mermaid/01_general_architecture_improved.mmd
+new file mode 100644
+index 0000000..a80f305
+--- /dev/null
++++ b/en/flowcharts/mermaid/01_general_architecture_improved.mmd
+@@ -0,0 +1,49 @@
++graph TB
++    subgraph "Network Layer"
++        NET["🌐 P2P Network<br/>Gossip Protocol"]
++    end
++    
++    subgraph "Production Layer"
++        PROD["🏭 Production Runtime<br/>Thread Pool Specialization"]
++    end
++    
++    NET -->|Events| NODE
++    PROD -->|Executes| NODE
++    
++    subgraph "Node Layer"
++        NODE["🖥️ NodeStateMachine<br/>Main Orchestrator"]
++    end
++    
++    NODE -->|Coordinates| BFT
++    NODE -->|Coordinates| EXEC
++    NODE -->|Coordinates| MEMPOOL
++    NODE -->|Coordinates| PROV
++    NODE -->|Coordinates| LIVELOCK
++    
++    subgraph "Main Components"
++        BFT["🔷 BFT State Machine<br/>HotStuff-2 Consensus<br/>- Vote Locking<br/>- Unlock Rule<br/>- View Sync"]
++        EXEC["🟢 Execution Engine<br/>Transaction Execution<br/>- Jellyfish Merkle Tree<br/>- State Root"]
++        MEMPOOL["🟡 Mempool<br/>Transaction Pool<br/>- Conflict Detection<br/>- Categorization<br/>- Ready/Deferred"]
++        PROV["🟣 Provisioning<br/>Block Preparation<br/>- Collect Txs<br/>- Order Txs"]
++        LIVELOCK["🟠 Livelock Prevention<br/>Cycle Detection<br/>- Deadlock Detection<br/>- Retry Logic"]
++    end
++    
++    BFT -->|Uses| TYPES
++    EXEC -->|Uses| TYPES
++    MEMPOOL -->|Uses| TYPES
++    
++    subgraph "Data Layer"
++        TYPES["📋 Types & Structures<br/>- Hash<br/>- Block<br/>- Vote<br/>- QC"]
++        CRYPTO["🔐 Cryptography<br/>- BLS12-381<br/>- Blake3<br/>- Ed25519"]
++        STORAGE["💾 Storage<br/>- State Root<br/>- Ledger<br/>- Transactions"]
++    end
++    
++    TYPES -->|Validates| CRYPTO
++    CRYPTO -->|Protects| STORAGE
++    
++    style NODE fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style BFT fill:#4dabf7,stroke:#1971c2,color:#fff
++    style EXEC fill:#51cf66,stroke:#2f9e44,color:#fff
++    style MEMPOOL fill:#ffd43b,stroke:#f59f00,color:#000
++    style PROV fill:#da77f2,stroke:#9c36b5,color:#fff
++    style LIVELOCK fill:#ff8787,stroke:#fa5252,color:#fff
+diff --git a/en/flowcharts/mermaid/02_bft_consensus_cycle_corrected.mmd b/en/flowcharts/mermaid/02_bft_consensus_cycle_corrected.mmd
+new file mode 100644
+index 0000000..841f359
+--- /dev/null
++++ b/en/flowcharts/mermaid/02_bft_consensus_cycle_corrected.mmd
+@@ -0,0 +1,62 @@
++graph TD
++    A["🚀 Epoch Start<br/>Epoch = N"] --> B["Round = 0"]
++    B --> C["👑 Leader Election<br/>Leader = Validator[Round % N]"]
++    C --> D["🔗 Leader Proposes Block<br/>Block(Height, Round, Txs)"]
++    D --> E["📥 Nodes Receive Proposal"]
++    E --> F["✅ Block Validation<br/>- Leader Signature<br/>- Merkle Root<br/>- State Root<br/>- Parent QC"]
++    
++    F -->|Invalid| G["❌ Reject Block"]
++    G --> H["⏱️ Timeout<br/>Waiting for valid block"]
++    
++    F -->|Valid| I["🔒 Check Vote Lock<br/>voted_heights.contains_key(height)?"]
++    
++    I -->|Already Voted| J["🚫 Cannot Vote<br/>Already locked on different block"]
++    J --> H
++    
++    I -->|Not Voted| K["🗳️ Node Votes on Block<br/>Vote(Block, Validator, Sig)"]
++    K --> L["📢 Broadcast Vote<br/>Send to all"]
++    
++    L --> M["📊 Vote Collection<br/>VoteSet accumulates votes"]
++    M --> N{"2f+1 Votes<br/>Received?"}
++    
++    N -->|No| O["⏱️ Timeout<br/>Waiting for more votes"]
++    O --> P["🔄 Skip to Next Round<br/>Round += 1"]
++    P --> C
++    
++    N -->|Yes| Q["✍️ Signature Aggregation<br/>BLS12-381 Aggregation"]
++    Q --> R["🎖️ Create Quorum Certificate<br/>QC(Block, Signers, AggSig)"]
++    R --> S["📡 Broadcast QC<br/>Send to all nodes"]
++    
++    S --> T["📥 Nodes Receive QC"]
++    T --> U["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
++    U --> V["🔓 Unlock Vote<br/>Remove locks for heights ≤ QC.height"]
++    
++    V --> W{"Two-Chain Rule?<br/>QC.parent_qc exists?"}
++    
++    W -->|No| X["⏳ Wait for Next QC"]
++    X --> P
++    
++    W -->|Yes| Y["✅ Block Committed!<br/>Two-chain rule satisfied"]
++    Y --> Z["⚙️ Execute Transactions<br/>Update State Root"]
++    Z --> AA["💾 Finalize Block"]
++    
++    AA --> AB{"Epoch End?<br/>Blocks >= Threshold"}
++    
++    AB -->|No| AC["🔄 Next Round<br/>Round += 1"]
++    AC --> C
++    
++    AB -->|Yes| AD["🎉 New Epoch<br/>Epoch += 1<br/>Round = 0"]
++    AD --> A
++    
++    H --> AE["⏱️ View Change Timer<br/>Timeout X seconds"]
++    AE --> AF["🔓 Unlock Vote<br/>Remove all locks"]
++    AF --> AG["➕ Increment View<br/>View += 1<br/>Round += 1"]
++    AG --> C
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style Y fill:#51cf66,stroke:#2f9e44,color:#fff
++    style R fill:#4dabf7,stroke:#1971c2,color:#fff
++    style U fill:#ffd43b,stroke:#f59f00,color:#000
++    style V fill:#ffd43b,stroke:#f59f00,color:#000
++    style I fill:#a78bfa,stroke:#7c3aed,color:#fff
++    style J fill:#ff8787,stroke:#fa5252,color:#fff
+diff --git a/en/flowcharts/mermaid/03_transaction_flow_improved.mmd b/en/flowcharts/mermaid/03_transaction_flow_improved.mmd
+new file mode 100644
+index 0000000..f5a1836
+--- /dev/null
++++ b/en/flowcharts/mermaid/03_transaction_flow_improved.mmd
+@@ -0,0 +1,65 @@
++graph LR
++    subgraph "Phase 1: Reception & Validation"
++        A["📥 Transaction Received<br/>from Client"]
++        B["✅ Basic Validation<br/>- Signature<br/>- Format<br/>- Nonce"]
++    end
++    
++    subgraph "Phase 2: Mempool Processing"
++        C["📊 Dependency Analysis<br/>DependencyGraph"]
++        D{"Conflict<br/>Detected?"}
++        E["🟢 Ready State<br/>No conflicts"]
++        F["🔴 Deferred State<br/>Waiting for dependency"]
++    end
++    
++    subgraph "Phase 3: Block Inclusion"
++        G["📋 Categorize Transaction<br/>1. Retry (failed before)<br/>2. Priority (CommitmentProof)<br/>3. Normal"]
++        H["🔗 Propose in Block<br/>Order: Retry → Priority → Normal"]
++    end
++    
++    subgraph "Phase 4: Consensus"
++        I["🗳️ Nodes Vote on Block"]
++        J["🎖️ QC Created<br/>2f+1 Consensus"]
++    end
++    
++    subgraph "Phase 5: Execution"
++        K["✅ Block Committed<br/>Two-chain rule"]
++        L["⚙️ Execute Transaction<br/>Update State"]
++        M["🟢 Executed State<br/>Success"]
++    end
++    
++    subgraph "Phase 6: Finalization"
++        N["💾 Update Mempool<br/>Remove executed"]
++        O["🏁 Transaction Complete"]
++    end
++    
++    A --> B
++    B -->|Invalid| P["❌ Reject<br/>Discard"]
++    P --> O
++    
++    B -->|Valid| C
++    C --> D
++    D -->|No Conflict| E
++    D -->|Conflict| F
++    
++    E --> G
++    F --> Q["⏳ Wait for Dependency<br/>Retry later"]
++    Q --> E
++    
++    G --> H
++    H --> I
++    I --> J
++    J --> K
++    K --> L
++    L -->|Success| M
++    L -->|Failure| R["🔴 Aborted State<br/>Conflict/Error"]
++    R --> N
++    
++    M --> N
++    N --> O
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style E fill:#51cf66,stroke:#2f9e44,color:#fff
++    style F fill:#ffd43b,stroke:#f59f00,color:#000
++    style H fill:#4dabf7,stroke:#1971c2,color:#fff
++    style M fill:#51cf66,stroke:#2f9e44,color:#fff
++    style R fill:#ff8787,stroke:#fa5252,color:#fff
+diff --git a/en/flowcharts/mermaid/04_cross_shard_transaction_flow_improved.mmd b/en/flowcharts/mermaid/04_cross_shard_transaction_flow_improved.mmd
+new file mode 100644
+index 0000000..f58f740
+--- /dev/null
++++ b/en/flowcharts/mermaid/04_cross_shard_transaction_flow_improved.mmd
+@@ -0,0 +1,50 @@
++graph TD
++    A["🚀 Cross-Shard Transaction<br/>Spans Multiple Shards"] --> B["📋 Identify Shards<br/>Source & Destination"]
++    B --> C["🔗 Shard 1: Source<br/>Prepare Phase"]
++    
++    C --> D["✅ Validate Transaction<br/>- Signature<br/>- Sufficient Balance"]
++    D -->|Invalid| E["❌ Reject"]
++    E --> F["🏁 End"]
++    
++    D -->|Valid| G["⚙️ Execute Source<br/>- Deduct Balance<br/>- Create CommitmentProof"]
++    G --> H["📜 CommitmentProof<br/>Cryptographic proof of execution"]
++    
++    H --> I["📤 Send CommitmentProof<br/>to Destination Shard"]
++    I --> J["🔗 Shard 2: Destination<br/>Commit Phase"]
++    
++    J --> K["📥 Receive CommitmentProof"]
++    K --> L["✅ Verify CommitmentProof<br/>- Signature valid?<br/>- Source executed?"]
++    
++    L -->|Invalid| M["❌ Reject<br/>Invalid proof"]
++    M --> N["🔄 Rollback Source<br/>Refund balance"]
++    N --> F
++    
++    L -->|Valid| O["📋 Categorize in Block<br/>Priority Transaction<br/>(has CommitmentProof)"]
++    O --> P["🟢 Ready State<br/>Included in block"]
++    
++    P --> Q["🗳️ Consensus<br/>Nodes vote on block"]
++    Q --> R["🎖️ QC Created<br/>2f+1 consensus"]
++    
++    R --> S["✅ Block Committed<br/>Two-chain rule"]
++    S --> T["⚙️ Execute Destination<br/>- Add Balance<br/>- Finalize"]
++    
++    T --> U{"Execution<br/>Success?"}
++    
++    U -->|Yes| V["✅ Transaction Finalized<br/>Both shards updated"]
++    U -->|No| W["🔄 Rollback<br/>Revert both shards"]
++    
++    V --> X["💾 Update State Root<br/>Both shards"]
++    W --> X
++    
++    X --> Y["📋 Update Mempool<br/>Remove from pending"]
++    Y --> F
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style C fill:#4dabf7,stroke:#1971c2,color:#fff
++    style J fill:#4dabf7,stroke:#1971c2,color:#fff
++    style G fill:#51cf66,stroke:#2f9e44,color:#fff
++    style H fill:#ffd43b,stroke:#f59f00,color:#000
++    style O fill:#51cf66,stroke:#2f9e44,color:#fff
++    style T fill:#51cf66,stroke:#2f9e44,color:#fff
++    style V fill:#51cf66,stroke:#2f9e44,color:#fff
++    style W fill:#ff8787,stroke:#fa5252,color:#fff
+diff --git a/en/flowcharts/mermaid/05_voting_qc_cycle_improved.mmd b/en/flowcharts/mermaid/05_voting_qc_cycle_improved.mmd
+new file mode 100644
+index 0000000..208190a
+--- /dev/null
++++ b/en/flowcharts/mermaid/05_voting_qc_cycle_improved.mmd
+@@ -0,0 +1,56 @@
++graph TD
++    A["📝 Block Proposed<br/>Block(Height, Round, Txs)"] --> B["📥 Node Receives Proposal"]
++    B --> C["✅ Validate Block<br/>- Leader Signature<br/>- Merkle Root<br/>- State Root<br/>- Parent QC"]
++    
++    C -->|Invalid| D["❌ Reject<br/>Does not vote"]
++    D --> E["End"]
++    
++    C -->|Valid| F["🔒 Verify Vote Lock<br/>Check: QC.Round > Locked.Round?"]
++    
++    F -->|No| G["✅ Lock is Valid<br/>Can vote"]
++    F -->|Yes| H["🔓 Lock Expired<br/>Can vote"]
++    
++    G --> I["🗳️ Create Vote<br/>Vote(Block, Validator, Sig)"]
++    H --> I
++    
++    I --> J["📢 Broadcast Vote<br/>Send to all nodes"]
++    J --> K["📊 Vote Collection<br/>VoteSet at Leader"]
++    K --> L{"2f+1 Votes<br/>Received?"}
++    
++    L -->|No| M["⏳ Wait for More Votes"]
++    M --> N{"Timeout?"}
++    N -->|Yes| O["⏱️ Skip to Next Round"]
++    N -->|No| M
++    
++    L -->|Yes| P["✍️ Batch Verification<br/>Verify all votes"]
++    P -->|Fail| Q["❌ Reject Votes<br/>Invalid signatures"]
++    Q --> O
++    
++    P -->|Success| R["🔗 Aggregate Signatures<br/>BLS12-381 Aggregation"]
++    R --> S["🎖️ Create Quorum Certificate<br/>QC(Block, Signers, AggSig)"]
++    S --> T["📡 Broadcast QC<br/>Send to all nodes"]
++    
++    T --> U["📥 Nodes Receive QC"]
++    U --> V["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
++    V --> W["🔓 Unlock Votes<br/>Remove locks for h ≤ QC.height"]
++    
++    W --> X{"Two-Chain Rule?<br/>QC.parent_qc exists?"}
++    
++    X -->|No| Y["⏳ Wait for Next QC"]
++    Y --> O
++    
++    X -->|Yes| Z["✅ Block Committed<br/>Two-chain rule satisfied"]
++    Z --> AA["⚙️ Execute Transactions<br/>Update State Root"]
++    AA --> AB["💾 Block Finalized"]
++    AB --> AC["🏁 End"]
++    
++    O --> AC
++    E --> AC
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style F fill:#a78bfa,stroke:#7c3aed,color:#fff
++    style I fill:#4dabf7,stroke:#1971c2,color:#fff
++    style S fill:#51cf66,stroke:#2f9e44,color:#fff
++    style V fill:#ffd43b,stroke:#f59f00,color:#000
++    style W fill:#ffd43b,stroke:#f59f00,color:#000
++    style Z fill:#51cf66,stroke:#2f9e44,color:#fff
+diff --git a/en/flowcharts/mermaid/06_distributed_execution_improved.mmd b/en/flowcharts/mermaid/06_distributed_execution_improved.mmd
+new file mode 100644
+index 0000000..f4b1b1d
+--- /dev/null
++++ b/en/flowcharts/mermaid/06_distributed_execution_improved.mmd
+@@ -0,0 +1,63 @@
++graph TD
++    A["🚀 Block Committed<br/>Ready for Execution"] --> B["📋 Categorize Transactions<br/>1. Retry (high priority)<br/>2. Priority (CommitmentProof)<br/>3. Normal"]
++    
++    B --> C["🟢 Execute Retry Transactions<br/>Failed in previous blocks"]
++    C --> D["📊 Detect Conflicts<br/>DependencyGraph"]
++    
++    D --> E{"Conflict<br/>Detected?"}
++    
++    E -->|No| F["✅ Execute Successfully<br/>Update State"]
++    E -->|Yes| G["🔁 Livelock Check<br/>Cycle Detection"]
++    
++    G --> H{"Cycle<br/>Detected?"}
++    
++    H -->|No| I["⚙️ Resolve Conflict<br/>Choose winner"]
++    I --> J["🟡 Defer Loser<br/>Retry in next block"]
++    J --> F
++    
++    H -->|Yes| K["🚨 Cycle Found<br/>Deadlock Prevention"]
++    K --> L["⏸️ Defer Transaction<br/>Queue for retry"]
++    L --> F
++    
++    F --> M["🟢 Execute Priority Transactions<br/>With CommitmentProof"]
++    M --> N["🔗 Cross-Shard Coordination<br/>Verify CommitmentProof"]
++    N --> O{"Proof<br/>Valid?"}
++    
++    O -->|No| P["❌ Reject<br/>Invalid proof"]
++    P --> M
++    
++    O -->|Yes| Q["✅ Execute<br/>Update State"]
++    Q --> R["🟢 Execute Normal Transactions<br/>Standard execution"]
++    R --> S["⚙️ Apply Writes<br/>Update Jellyfish Merkle Tree"]
++    
++    S --> T["📊 Detect Conflicts<br/>DependencyGraph"]
++    T --> U{"Conflict?"}
++    
++    U -->|No| V["✅ Execute Successfully"]
++    U -->|Yes| W["🔁 Livelock Check"]
++    
++    W --> X{"Cycle?"}
++    X -->|No| Y["⚙️ Resolve Conflict"]
++    X -->|Yes| Z["⏸️ Defer"]
++    
++    Y --> V
++    Z --> V
++    
++    V --> AA["💾 Calculate State Root<br/>JMT Root Hash"]
++    AA --> AB{"State Root<br/>Matches?"}
++    
++    AB -->|No| AC["❌ Execution Error<br/>State mismatch"]
++    AB -->|Yes| AD["✅ Block Finalized<br/>State committed"]
++    
++    AD --> AE["📋 Update Mempool<br/>- Remove executed<br/>- Retry deferred<br/>- Remove aborted"]
++    AE --> AF["🏁 Execution Complete"]
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style B fill:#4dabf7,stroke:#1971c2,color:#fff
++    style C fill:#51cf66,stroke:#2f9e44,color:#fff
++    style M fill:#51cf66,stroke:#2f9e44,color:#fff
++    style R fill:#51cf66,stroke:#2f9e44,color:#fff
++    style G fill:#da77f2,stroke:#9c36b5,color:#fff
++    style K fill:#da77f2,stroke:#9c36b5,color:#fff
++    style W fill:#da77f2,stroke:#9c36b5,color:#fff
++    style AD fill:#51cf66,stroke:#2f9e44,color:#fff
+diff --git a/en/flowcharts/mermaid/07_complete_height_cycle_corrected.mmd b/en/flowcharts/mermaid/07_complete_height_cycle_corrected.mmd
+new file mode 100644
+index 0000000..078cb9c
+--- /dev/null
++++ b/en/flowcharts/mermaid/07_complete_height_cycle_corrected.mmd
+@@ -0,0 +1,57 @@
++graph TD
++    A["🚀 Epoch Start<br/>Height = 0, Round = 0"] --> B["👑 Leader Election<br/>Leader = Validator[Height % N]"]
++    B --> C["📝 Propose Block<br/>Block(Height, Round, Txs)"]
++    C --> D["📥 Nodes Receive"]
++    D --> E["✅ Validate Block"]
++    
++    E -->|Invalid| F["❌ Reject"]
++    F --> G["⏱️ Timeout"]
++    
++    E -->|Valid| H["🔒 Check Vote Lock<br/>voted_heights[Height]?"]
++    
++    H -->|Locked| I["🚫 Cannot Vote<br/>Already locked"]
++    I --> G
++    
++    H -->|Not Locked| J["🗳️ Vote on Block"]
++    J --> K["📊 Collect Votes"]
++    K --> L{"2f+1 Votes?"}
++    
++    L -->|No| M["⏱️ Timeout"]
++    M --> N["🔄 View Change<br/>Round += 1"]
++    N --> O["🔓 Unlock Votes<br/>Remove all locks"]
++    O --> B
++    
++    L -->|Yes| P["✍️ Aggregate Signatures<br/>BLS12-381"]
++    P --> Q["🎖️ Create QC<br/>QC(Height, Round)"]
++    Q --> R["📡 Broadcast QC"]
++    
++    R --> S["📥 Receive QC"]
++    S --> T["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
++    T --> U["🔓 Unlock Votes<br/>Remove locks ≤ QC.height"]
++    
++    U --> V{"Two-Chain Rule?<br/>Parent QC exists?"}
++    
++    V -->|No| W["⏳ Wait for Next QC"]
++    W --> N
++    
++    V -->|Yes| X["✅ Commit Block"]
++    X --> Y["⚙️ Execute Transactions"]
++    Y --> Z["💾 Update State Root"]
++    
++    Z --> AA{"Epoch End?<br/>Height >= Threshold"}
++    
++    AA -->|No| AB["➕ Next Height<br/>Height += 1<br/>Round = 0"]
++    AB --> B
++    
++    AA -->|Yes| AC["🎉 New Epoch<br/>Height += 1<br/>Round = 0"]
++    AC --> A
++    
++    G --> AD["⏱️ View Change Timer<br/>Timeout X seconds"]
++    AD --> N
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style X fill:#51cf66,stroke:#2f9e44,color:#fff
++    style Q fill:#4dabf7,stroke:#1971c2,color:#fff
++    style T fill:#ffd43b,stroke:#f59f00,color:#000
++    style U fill:#ffd43b,stroke:#f59f00,color:#000
++    style H fill:#a78bfa,stroke:#7c3aed,color:#fff
+diff --git a/en/flowcharts/mermaid/08_failure_handling_view_change_corrected.mmd b/en/flowcharts/mermaid/08_failure_handling_view_change_corrected.mmd
+new file mode 100644
+index 0000000..55deebd
+--- /dev/null
++++ b/en/flowcharts/mermaid/08_failure_handling_view_change_corrected.mmd
+@@ -0,0 +1,48 @@
++graph TD
++    A["⏱️ Round Timeout<br/>Leader Does Not Propose"] --> B["🚨 Detect Failure<br/>Waited X seconds"]
++    B --> C["🔓 Unlock Vote<br/>Remove Vote Locks"]
++    C --> D["➕ Increment View<br/>View += 1<br/>Round += 1"]
++    D --> E["👑 New Leader<br/>Leader = Validator[Round % N]"]
++    E --> F{"New Leader<br/>Honest?"}
++    
++    F -->|No| G["⏱️ Timeout Again<br/>Repeat View Change"]
++    G --> D
++    
++    F -->|Yes| H["📝 New Leader Proposes<br/>Block with HighQC"]
++    H --> I["🔄 Synchronization<br/>Nodes Receive Proposal"]
++    I --> J["✅ Validate Block<br/>- Signature<br/>- Merkle Root<br/>- State Root"]
++    
++    J -->|Invalid| K["❌ Reject<br/>New Timeout"]
++    K --> D
++    
++    J -->|Valid| L["🔒 Check Vote Lock<br/>voted_heights[Height]?"]
++    
++    L -->|Locked| M["🚫 Cannot Vote<br/>Already locked"]
++    M --> K
++    
++    L -->|Not Locked| N["🗳️ Vote on Block"]
++    N --> O["📊 Collect Votes<br/>2f+1 Required"]
++    O --> P{"Quorum<br/>Reached?"}
++    
++    P -->|No| Q["⏳ Wait for More Votes"]
++    Q --> K
++    
++    P -->|Yes| R["✍️ Aggregate Signatures<br/>BLS12-381 Aggregation"]
++    R --> S["🎖️ Create QC<br/>QC(Height, Round)"]
++    S --> T["📡 Broadcast QC<br/>Send to all nodes"]
++    
++    T --> U["📥 Nodes Receive QC"]
++    U --> V["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
++    V --> W["🔓 Unlock Votes<br/>Remove locks ≤ QC.height"]
++    
++    W --> X["✅ System Recovers<br/>Consensus Restored"]
++    X --> Y["🏁 Back to Normal<br/>Continue Consensus"]
++    
++    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
++    style C fill:#ffd43b,stroke:#f59f00,color:#000
++    style D fill:#ffd43b,stroke:#f59f00,color:#000
++    style E fill:#51cf66,stroke:#2f9e44,color:#fff
++    style H fill:#4dabf7,stroke:#1971c2,color:#fff
++    style V fill:#ffd43b,stroke:#f59f00,color:#000
++    style W fill:#ffd43b,stroke:#f59f00,color:#000
++    style X fill:#51cf66,stroke:#2f9e44,color:#fff
+diff --git a/en/guides/DETAILED_LEARNING_GUIDE_EN.md b/en/guides/DETAILED_LEARNING_GUIDE_EN.md
+index 24b1d19..14ac618 100644
+--- a/en/guides/DETAILED_LEARNING_GUIDE_EN.md
++++ b/en/guides/DETAILED_LEARNING_GUIDE_EN.md
+@@ -154,8 +154,8 @@ Someone claims: "TX2 is in the block"
+ Proof path:
+ - Hash(TX2) = xyz789
+ - Hash(TX1) = def456
+-- Hash(TX1 || TX2) = ghi012
+-- Hash(ghi012 || Hash(TX3||TX4)) = abc123 ✅ (matches root!)
++- Hash(TX1 | TX2) = ghi012
++- Hash(ghi012 | Hash(TX3|TX4)) = abc123 ✅ (matches root!)
+ 
+ Conclusion: TX2 is definitely in the block
+ ```
+@@ -245,7 +245,7 @@ pub const DOMAIN_BLOCK_VOTE: &[u8] = b"BLOCK_VOTE";
+ pub const DOMAIN_STATE_PROVISION: &[u8] = b"STATE_PROVISION";
+ pub const DOMAIN_EXEC_VOTE: &[u8] = b"EXEC_VOTE";
+ 
+-// The actual message that is signed is: DOMAIN_TAG || content
++// The actual message that is signed is: DOMAIN_TAG | content
+ fn block_vote_message(
+     shard_group: ShardGroupId,
+     height: u64,
+@@ -266,11 +266,11 @@ fn block_vote_message(
+ 
+ ```
+ Validator V1 signs:
+-Message = "BLOCK_VOTE" || shard=1 || height=10 || round=0 || hash=abc...
++Message = "BLOCK_VOTE" | shard=1 | height=10 | round=0 | hash=abc...
+ Signature = Sign(Message, V1_private_key)
+ 
+ Attacker tries to reuse signature for STATE_PROVISION:
+-Message2 = "STATE_PROVISION" || ... (same content)
++Message2 = "STATE_PROVISION" | ... (same content)
+ Verification: Verify(Signature, Message2, V1_public_key)
+ Result: ❌ FAILS! (Signature is for Message, not Message2)
+ ```
+@@ -279,12 +279,12 @@ Result: ❌ FAILS! (Signature is for Message, not Message2)
+ 
+ ```
+ Without shard in domain:
+-- Shard 0 validator signs: "BLOCK_VOTE" || height=10 || ...
++- Shard 0 validator signs: "BLOCK_VOTE" | height=10 | ...
+ - Attacker could reuse this signature in Shard 1
+ 
+ With shard in domain:
+-- Shard 0 validator signs: "BLOCK_VOTE" || shard=0 || height=10 || ...
+-- Shard 1 validator signs: "BLOCK_VOTE" || shard=1 || height=10 || ...
++- Shard 0 validator signs: "BLOCK_VOTE" | shard=0 | height=10 | ...
++- Shard 1 validator signs: "BLOCK_VOTE" | shard=1 | height=10 | ...
+ - Signatures are incompatible across shards ✅
+ ```
+ 
+@@ -454,122 +454,154 @@ Quorum not reached → Block B rejected ✅
+ 
+ ---
+ 
+-## 2.3. Ensuring Liveness: The Unlock Rule
++## 2.3. Ensuring Liveness: View Synchronization and the Unlock Rule
+ 
+-`Vote Locking` is essential for safety, but it can paralyze consensus if validators become locked on conflicting proposals that never reach quorum. The **Unlock Rule** solves this.
++`Vote Locking` is essential for safety, but it can paralyze consensus if validators become locked on conflicting proposals that never reach quorum. The `maybe_unlock_for_qc` function provides two critical mechanisms to ensure the network remains live.
+ 
+-**Rule**: When a validator sees a QC for height `H`, it knows the decision at height `H` is final. Therefore, it can safely discard all its `voted_heights` for heights `≤ H`.
++**Mechanism 1: View Synchronization**
++If a validator is behind the rest of the network (e.g., it's in round 2, but the network is already in round 5), it needs a way to catch up. When this validator sees a QC from a higher round, it immediately advances its own local view to match the QC's round. This ensures validators stay synchronized with the network's progress.
++
++**Mechanism 2: The Unlock Rule**
++When a validator sees a QC for height `H`, it knows the network has certified a block at that height. It can therefore safely discard its own vote locks for any height `≤ H`. This prevents a validator from being permanently stuck on an old, failed proposal, allowing it to vote for new proposals at higher heights.
+ 
+ ```rust
+ // Location: crates/bft/src/state.rs
+ fn maybe_unlock_for_qc(&mut self, qc: &QuorumCertificate) {
++    if qc.is_genesis() {
++        return;
++    }
++
++    // Mechanism 1: View Synchronization
++    // Advance our view to match the QC's round, ensuring we keep up with the network.
++    if qc.round > self.view {
++        self.view = qc.round;
++    }
++
++    // Mechanism 2: The Unlock Rule
++    // Find all vote locks for heights at or below the QC's height.
+     let qc_height = qc.height.0;
+-    // Discard all locks for heights that are now irrelevant.
+-    self.voted_heights.retain(|&height, _| height > qc_height);
++    let heights_to_unlock: Vec<u64> = self
++        .voted_heights
++        .keys()
++        .filter(|h| **h <= qc_height)
++        .copied()
++        .collect();
++
++    // Remove the identified locks, freeing the validator to vote in the future.
++    for height in heights_to_unlock {
++        self.voted_heights.remove(&height);
++    }
+ }
+ ```
+ 
+-### Livelock Scenario Without Unlock Rule
++### How These Mechanisms Prevent Livelock
++
++Let's revisit the scenario where consensus gets stuck.
+ 
+ ```
+-Height 10, Round 0:
+-V1 votes for Block A → voted_heights[10] = Block A
+-V2 votes for Block B → voted_heights[10] = Block B
+-V3 offline
++// Initial State: Consensus is stuck at Height 10.
++// V1 is locked on Block A, V2 is locked on Block B.
++// No new blocks can get a QC at this height.
+ 
+-Nope quorum reached (only 2 votes)
+-View change to Round 1
++// Liveness in Action:
++// 1. The network continues to make progress at other heights.
++//    Eventually, a QC for a higher height, say QC_11, is formed and broadcast.
+ 
+-Height 10, Round 1:
+-V3 proposes Block C
+-V1 tries to vote: voted_heights[10] = Block A ≠ Block C → CANNOT vote
+-V2 tries to vote: voted_heights[10] = Block B ≠ Block C → CANNOT vote
+-V3 votes for Block C
++// 2. V1 and V2 receive QC_11.
++//    They both call maybe_unlock_for_qc(&QC_11).
+ 
+-Only 1 vote → No quorum
+-CONSENSUS STUCK! ❌
+-```
++// 3. View Synchronization:
++//    V1 and V2 update their local view to match QC_11.round, synchronizing them.
+ 
+-### How Unlock Rule Fixes This
++// 4. Unlock Rule is Applied:
++//    The function collects heights to unlock: h <= 11.
++//    The lock for height 10 is found (since 10 <= 11).
++//    self.voted_heights.remove(&10) is called.
++//    V1 and V2 are now UNLOCKED for height 10. ✅
+ 
++// 5. Consensus Resumes:
++//    When a new proposal for Height 12 arrives, both V1 and V2 are free to vote,
++//    and the consensus process can continue.
+ ```
+-Height 10, Round 0:
+-V1 votes for Block A → voted_heights[10] = Block A
+-V2 votes for Block B → voted_heights[10] = Block B
+-V3 offline
+ 
+-No quorum reached
++### 🧠 Reflection
+ 
+-Height 9 QC forms (from previous round)
+-All validators receive QC 9
++**Question**: Why is it safe to remove locks for heights `≤ qc_height`?
+ 
+-Unlock:
+-voted_heights.retain(|height, _| height > 9)
+-voted_heights[10] is REMOVED! ✅
++**Answer**: Because a QC for height `H` is a cryptographic proof that 2f+1 validators have agreed on a block at that height. This makes the chain up to `H` certified. Any conflicting blocks at those heights can never get a QC due to the quorum intersection property. It is therefore safe to discard old locks, as they no longer contribute to the safety of the consensus.
+ 
+-Height 10, Round 1:
+-V3 proposes Block C
+-V1 tries to vote: voted_heights[10] = None → CAN vote ✅
+-V2 tries to vote: voted_heights[10] = None → CAN vote ✅
+-V3 votes for Block C
++**Follow-up Question**: What if a validator is so far behind it never sees a QC for the height it's locked on?
+ 
+-3 votes → Quorum reached → Consensus advances! ✅
+-```
++**Answer**: That's the elegance of the design! The unlock rule works with *any* QC for a height greater than or equal to the locked height. As long as the network as a whole is making progress (which it will with an honest majority), a validator will eventually see a QC from the future that is high enough to unlock its past vote, ensuring it can always rejoin the consensus.
+ 
+-### 🧠 Reflection
++---
+ 
+-**Question**: Unlock rule removes locks for heights ≤ qc_height. Why not remove locks for heights < qc_height?
++## 2.4. Proposing Blocks: The `on_proposal_timer` Function
+ 
+-**Answer**: Because height qc_height is already finalized (two-chain rule), so there's no risk of conflict there. But heights > qc_height can still have conflicts, so we keep the locks.
++The `on_proposal_timer` function is the pacemaker of the consensus engine. Instead of being a simple timeout for view changes, it is the primary trigger for a validator to **propose a new block** if it is the current leader. It is a complex function that orchestrates the core logic of block creation.
+ 
+-**Follow-up Question**: What if a validator never sees a QC? Won't it stay locked forever?
++Here is a breakdown of its responsibilities:
+ 
+-**Answer**: No! The unlock rule is applied whenever ANY QC is seen, even if it's not for the exact height you're locked on. As long as the network makes progress (which it will with an honest majority), you'll eventually see a QC that unlocks you.
++1.  **Determine Next Height**: It calculates the `next_height` for the new block, which is `latest_qc.height + 1`.
++2.  **Check Leadership**: It verifies if the current validator is the designated proposer for the `next_height` and current `round` using the formula `(height + round) % num_validators`.
++3.  **Check Vote Lock**: It checks if the validator has already voted at `next_height`. If so, it cannot propose a new, different block, which would violate the vote locking safety rule.
++4.  **Assemble Block**: If all checks pass, it gathers ready transactions from the Mempool, along with any necessary `CommitmentProof`s for cross-shard transactions.
++5.  **Build and Broadcast**: It constructs the new `Block` with the `latest_qc` as its parent and broadcasts it to the network.
+ 
+----
++```rust
++// Simplified logic of on_proposal_timer in crates/bft/src/state.rs
++pub fn on_proposal_timer(
++    &mut self,
++    ready_txs: &ReadyTransactions,
++    // ... other parameters
++) -> Vec<Action> {
++    // 1. Determine the next height to propose at.
++    let next_height = self.latest_qc.as_ref().map_or(self.committed_height + 1, |qc| qc.height.0 + 1);
++    let round = self.view;
++
++    // 2. Check if we are the leader for this height and round.
++    if !self.should_propose(next_height, round) {
++        return vec![/* Reschedule timer */];
++    }
+ 
+-## 2.4. Implicit View Changes
++    // 3. Check vote lock: if we already voted at this height, we can't propose a different block.
++    if self.voted_heights.contains_key(&next_height) {
++        return vec![/* Reschedule timer */];
++    }
+ 
+-Instead of a complex message protocol to change leaders, HotStuff-2 uses local timeouts. If a proposer fails to produce a block in time, each validator independently advances to the next round. The new leader is determined deterministically by the formula `(height + new_round) % num_validators`.
++    // 4. Assemble the block's contents.
++    let parent_qc = self.latest_qc.clone().unwrap_or_else(QuorumCertificate::genesis);
++    let transactions = ready_txs.all_transactions(); // Simplified
+ 
+-This dramatically simplifies the protocol, making it more robust and easier to analyze.
++    // 5. Build the new block and broadcast it.
++    let new_block = Block::new(parent_qc, next_height, round, transactions, ...);
++    self.broadcast_block(new_block);
+ 
+-```rust
+-// Location: crates/bft/src/state.rs
+-pub fn on_proposal_timer(&mut self) -> Vec<Action> {
+-    // If proposer didn't produce block in time
+-    self.view += 1;
+-    self.view_at_height_start = self.view;
+-    
+-    // Next proposer changes automatically
+-    // proposer = (height + new_round) % num_validators
++    vec![/* ... other actions ... */]
+ }
+ ```
+ 
+-### Example Timeline
++### What About View Changes?
+ 
+-```
+-Height 10, Round 0:
+-Proposer: (10 + 0) % 4 = V2
+-V2 doesn't produce block in time
++If a leader fails to produce a block, other validators won't receive a valid proposal. After a certain period, a separate `on_view_change_timer` fires on each validator. This is the timer that increments the local `view` (round), causing the validators to move to the next leader. The `on_proposal_timer` then allows the *new* leader to build and propose a block.
+ 
+-Timeout (100ms):
+-V0 advances: view = 1
+-V1 advances: view = 1
+-V2 advances: view = 1
+-V3 advances: view = 1
++### 🧠 Reflection
+ 
+-Height 10, Round 1:
+-Proposer: (10 + 1) % 4 = V3
+-V3 proposes block
+-Consensus advances
+-```
++**Question**: Why is the `on_proposal_timer` so complex? Why not just have the leader propose a block whenever it wants?
+ 
+-### 🧠 Reflection
++**Answer**: The strict checks within `on_proposal_timer` are essential for the safety and liveness of the protocol. Checking leadership ensures only one validator proposes at a time. Checking the vote lock prevents a validator from equivocating and violating safety. Determining the height from the latest QC ensures the chain always extends from the most advanced certified block, contributing to liveness.
++
++---
++
++## 2.5. Keeping Time: How Validators Stay Synchronized
++
++A key challenge in a distributed system is ensuring all participants have a roughly synchronized view of the state, in this case, the current `round` (or `view`). If validators have wildly different local views, electing a leader and reaching a quorum becomes impossible.
++
++Hyperscale-rs solves this elegantly without a central clock:
+ 
+-**Question**: If each validator advances its round locally, how do they synchronize?
++**Synchronization via QCs**: The Quorum Certificate (QC) acts as a network-wide "beacon of time". As we saw in the `maybe_unlock_for_qc` function, whenever a validator receives a QC with a round number higher than its own, it immediately fast-forwards its local round to match the QC's round. Since QCs are broadcast to all validators, this single mechanism ensures that any validator that falls behind will quickly catch up to the rest of the network.
+ 
+-**Answer**: Via **QCs**! When you receive a QC in round R, you know the quorum is in round R, so you advance to round R+1. This ensures all validators stay roughly synchronized.
++This creates a powerful feedback loop: progress (in the form of QCs) drives synchronization, and synchronization enables further progress.
+ 
+ ---
+ 
+diff --git a/pt/guias/GUIA_APRENDIZADO.md b/pt/guias/GUIA_APRENDIZADO.md
+index 579d3b0..49626c9 100644
+--- a/pt/guias/GUIA_APRENDIZADO.md
++++ b/pt/guias/GUIA_APRENDIZADO.md
+@@ -1,4 +1,4 @@
+-# 🎓 Guia de Aprendizado: Hyperscale-RS
++'''# 🎓 Guia de Aprendizado: Hyperscale-RS
+ 
+ ## Introdução
+ 
+@@ -161,8 +161,8 @@ Alguém diz: "TX2 está no bloco"
+ Prova:
+ - Hash(TX2) = xyz789
+ - Hash(TX1) = def456
+-- Hash(TX1 || TX2) = ghi012
+-- Hash(ghi012 || TX3) = abc123 ✅ (match root!)
++- Hash(TX1 | TX2) = ghi012
++- Hash(ghi012 | TX3) = abc123 ✅ (match root!)
+ 
+ Conclusão: TX2 definitivamente está no bloco
+ ```
+@@ -277,7 +277,7 @@ pub const DOMAIN_BLOCK_VOTE: &[u8] = b"BLOCK_VOTE";
+ pub const DOMAIN_STATE_PROVISION: &[u8] = b"STATE_PROVISION";
+ pub const DOMAIN_EXEC_VOTE: &[u8] = b"EXEC_VOTE";
+ 
+-// Mensagem assinada = DOMAIN_TAG || conteúdo
++// Mensagem assinada = DOMAIN_TAG | conteúdo
+ fn block_vote_message(
+     shard_group: ShardGroupId,
+     height: u64,
+@@ -298,11 +298,11 @@ fn block_vote_message(
+ 
+ ```
+ Validador V1 assina:
+-Message = "BLOCK_VOTE" || shard=1 || height=10 || round=0 || hash=abc...
++Message = "BLOCK_VOTE" | shard=1 | height=10 | round=0 | hash=abc...
+ Signature = Sign(Message, V1_private_key)
+ 
+ Atacante tenta reusar assinatura para STATE_PROVISION:
+-Message2 = "STATE_PROVISION" || ... (mesmo conteúdo)
++Message2 = "STATE_PROVISION" | ... (mesmo conteúdo)
+ Verificação: Verify(Signature, Message2, V1_public_key)
+ Resultado: ❌ FALHA! (Signature é para Message, não Message2)
+ ```
+@@ -505,1025 +505,419 @@ Height 1:
+ 
+ ---
+ 
+-## 2.3 Vote Locking (Segurança)
++## 2.3. Segurança e Liveness: Bloqueio de Voto e a Regra de Desbloqueio
+ 
+-### Problema
+-
+-```
+-Height 10, Round 0:
+-V0 propõe Block A
+-V1 vota em Block A
+-V2 vota em Block A
+-V3 offline
++Para garantir a segurança, o HotStuff-2 usa uma regra de **Bloqueio de Voto (Vote Locking)**: uma vez que um validador vota em um bloco a uma certa altura, ele não pode votar em um bloco *diferente* na mesma altura. Isso previne que um validador malicioso vote em duas cadeias conflitantes.
+ 
+-Round 0 timeout → View change para Round 1
++No entanto, essa regra sozinha pode travar o consenso (um problema de **Liveness**). Se validadores diferentes se bloquearem em blocos conflitantes que nunca atingem um quórum, ninguém consegue mais votar. A função `maybe_unlock_for_qc` resolve isso com dois mecanismos cruciais.
+ 
+-Height 10, Round 1:
+-V3 (novo proposer) propõe Block B (diferente!)
+-V1 quer votar em Block B
+-V2 quer votar em Block B
+-
+-Resultado: Dois blocos diferentes em height 10!
+-VIOLAÇÃO DE SEGURANÇA! ❌
+-```
++**Mecanismo 1: Sincronização de View (Round)**
++Se um validador fica para trás, ele precisa se atualizar. Ao ver um QC com um `round` (ou `view`) mais alto que o seu, ele imediatamente avança seu `view` local para corresponder ao do QC, mantendo-se sincronizado com a rede.
+ 
+-### Solução: Vote Locking
++**Mecanismo 2: A Regra de Desbloqueio (Unlock Rule)**
++Ao ver um QC para a altura `H`, um validador sabe que a rede certificou um bloco naquela altura. Portanto, é seguro descartar seus bloqueios de voto para qualquer altura `≤ H`, permitindo que ele volte a participar do consenso.
+ 
+ ```rust
+-// Arquivo: crates/bft/src/state.rs
+-
+-pub voted_heights: HashMap<u64, (Hash, u64)>
+-
+-// Quando votamos em um bloco:
+-fn try_vote_on_block(&mut self, block_hash: Hash, height: u64, round: u64) {
+-    // Verificar se já votamos em altura
+-    if let Some(&(existing_hash, _)) = self.voted_heights.get(&height) {
+-        if existing_hash != block_hash {
+-            // Já votamos em outro bloco → NÃO VOTAMOS
+-            debug!("Vote locking: already voted for different block");
+-            return vec![];
+-        }
++// Localização: crates/bft/src/state.rs
++fn maybe_unlock_for_qc(&mut self, qc: &QuorumCertificate) {
++    if qc.is_genesis() {
++        return;
+     }
+-    
+-    // Registrar voto
+-    self.voted_heights.insert(height, (block_hash, round));
+-    
+-    // Criar e enviar BlockVote
+-    self.create_vote(block_hash, height, round)
+-}
+-```
+-
+-### Como Funciona
+-
+-```
+-Height 10, Round 0:
+-V1 vota em Block A
+-voted_heights[10] = (Block A, round 0)
+-
+-Height 10, Round 1:
+-V3 propõe Block B
+-V1 recebe Block B
+-V1 tenta votar em Block B
+-Verificação: voted_heights[10] = (Block A, round 0) ≠ Block B
+-Resultado: V1 NÃO vota em Block B ✅ (safety preserved)
+-```
+-
+-### 🧠 Reflexão
+-
+-**Pergunta**: Vote locking previne que V1 vote em Block B. Mas e se Block B é realmente melhor? Consenso não fica travado?
+-
+-**Resposta**: Boa pergunta! Vamos ver a solução: **Unlock rule**.
+-
+----
+ 
+-## 2.4 Unlock Rule (Liveness)
+-
+-### Problema
+-
+-```
+-Height 10, Round 0:
+-V1 vota em Block A → voted_heights[10] = Block A
+-V2 vota em Block B → voted_heights[10] = Block B
+-V3 offline
+-
+-Nenhum atinge quorum (só 2 votos)
+-View change para Round 1
+-
+-Height 10, Round 1:
+-V3 propõe Block C
+-V1 quer votar em Block C
+-V1 tenta: voted_heights[10] = Block A ≠ Block C
+-V1 NÃO vota
+-
+-V2 quer votar em Block C
+-V2 tenta: voted_heights[10] = Block B ≠ Block C
+-V2 NÃO vota
+-
+-V3 vota em Block C (1 voto)
+-CONSENSO TRAVADO! ❌
+-```
+-
+-### Solução: Unlock Rule
+-
+-```rust
+-// Arquivo: crates/bft/src/state.rs
++    // Mecanismo 1: Sincronização de View
++    // Avança nossa view para corresponder à do QC, garantindo que acompanhemos a rede.
++    if qc.round > self.view {
++        self.view = qc.round;
++    }
+ 
+-fn maybe_unlock_for_qc(&mut self, qc: &QuorumCertificate) {
++    // Mecanismo 2: A Regra de Desbloqueio
++    // Encontra todos os bloqueios de voto para alturas iguais ou inferiores à do QC.
+     let qc_height = qc.height.0;
+-    
+-    // Remover locks em alturas ≤ qc_height
+-    self.voted_heights.retain(|&height, _| height > qc_height);
++    let heights_to_unlock: Vec<u64> = self
++        .voted_heights
++        .keys()
++        .filter(|h| **h <= qc_height)
++        .copied()
++        .collect();
++
++    // Remove os bloqueios identificados, liberando o validador para votar no futuro.
++    for height in heights_to_unlock {
++        self.voted_heights.remove(&height);
++    }
+ }
+ ```
+ 
+-### Como Funciona
++### Como Isso Evita o Travamento (Livelock)
+ 
+-```
+-Height 10, Round 0:
+-V1 vota em Block A → voted_heights[10] = Block A
+-V2 vota em Block B → voted_heights[10] = Block B
+-Nenhum atinge quorum
+-
+-Height 9 QC forma (de round anterior)
+-Todos recebem QC 9
+-
+-Unlock:
+-voted_heights.retain(|height, _| height > 9)
+-voted_heights[10] é removido! ✅
+-
+-Height 10, Round 1:
+-V3 propõe Block C
+-V1 tenta votar: voted_heights[10] = None
+-V1 PODE votar em Block C! ✅
+-V2 tenta votar: voted_heights[10] = None
+-V2 PODE votar em Block C! ✅
+-V3 vota em Block C
+-
+-3 votos → Quorum → Consenso avança! ✅
+-```
+-
+-### 🧠 Reflexão
+-
+-**Pergunta**: Unlock rule remove locks em alturas ≤ qc_height. Por que não remover locks em alturas < qc_height?
+-
+-**Resposta**: Porque altura qc_height já foi commitada (two-chain rule), então não há risco de conflito nela. Mas alturas > qc_height ainda podem ter conflitos, então mantemos os locks.
+-
+----
++Vamos revisitar o cenário onde o consenso trava:
+ 
+-## 2.5 View Changes (Implicit)
+-
+-### Conceito
++```
++// Estado Inicial: Consenso travado na Altura 10.
++// V1 está bloqueado no Bloco A, V2 está bloqueado no Bloco B.
++// Nenhum novo bloco consegue um QC nesta altura.
+ 
+-**HotStuff-2 usa view changes implícitos**: Cada validador avança seu round localmente no timeout.
++// Liveness em Ação:
++// 1. A rede continua a progredir em outras alturas.
++//    Eventualmente, um QC para uma altura maior, digamos QC_11, é formado e transmitido.
+ 
+-```rust
+-// Arquivo: crates/bft/src/state.rs
++// 2. V1 e V2 recebem o QC_11.
++//    Ambos chamam a função maybe_unlock_for_qc(&QC_11).
+ 
+-pub fn on_proposal_timer(&mut self) -> Vec<Action> {
+-    // Se proposer não produziu bloco em tempo
+-    self.view += 1;
+-    self.view_at_height_start = self.view;
+-    
+-    // Próximo proposer muda automaticamente
+-    // proposer = (height + new_round) % num_validators
+-}
+-```
++// 3. Sincronização de View:
++//    V1 e V2 atualizam sua view local para corresponder a QC_11.round, sincronizando-se.
+ 
+-### Exemplo
++// 4. Regra de Desbloqueio é Aplicada:
++//    A função coleta as alturas para desbloquear: h <= 11.
++//    O bloqueio para a altura 10 é encontrado (pois 10 <= 11).
++//    self.voted_heights.remove(&10) é chamado.
++//    V1 e V2 estão agora DESBLOQUEADOS para a altura 10. ✅
+ 
+-```
+-Height 10, Round 0:
+-Proposer: (10 + 0) % 4 = V2
+-V2 não produz bloco em tempo
+-
+-Timeout (100ms):
+-V0 avança: view = 1
+-V1 avança: view = 1
+-V2 avança: view = 1
+-V3 avança: view = 1
+-
+-Height 10, Round 1:
+-Proposer: (10 + 1) % 4 = V3
+-V3 propõe bloco
+-Consenso avança
++// 5. Consenso Retoma:
++//    Quando uma nova proposta para a Altura 12 chegar, tanto V1 quanto V2 estarão livres para votar,
++//    e o processo de consenso pode continuar.
+ ```
+ 
+-### Benefício: Sem Protocolo Separado
++### 🧠 Reflexão
+ 
+-```
+-HotStuff original:
+-├─ Protocolo de consenso
+-├─ Protocolo de view change (separado)
+-└─ Protocolo de sincronização
+-
+-HotStuff-2:
+-├─ Protocolo de consenso
+-├─ View changes implícitos (sem protocolo)
+-└─ Sincronização via QCs
+-```
++**Pergunta**: Por que é seguro remover bloqueios para alturas `≤ qc_height`?
+ 
+-### 🧠 Reflexão
++**Resposta**: Porque um QC para a altura `H` é uma prova criptográfica de que 2f+1 validadores concordaram com um bloco naquela altura. Isso torna a cadeia até `H` certificada. Qualquer bloco conflitante nessas alturas nunca conseguirá um QC devido à propriedade de interseção de quórum. Portanto, é seguro descartar bloqueios antigos, pois eles não contribuem mais para a segurança do consenso.
+ 
+-**Pergunta**: Se cada validador avança seu round localmente, como eles sincronizam?
++**Pergunta de Acompanhamento**: E se um validador estiver tão atrasado que nunca vê um QC para a altura em que está bloqueado?
+ 
+-**Resposta**: Via **QCs**! Quando você recebe QC em round R, você sabe que quorum está em round R, então você avança para round R+1.
++**Resposta**: Essa é a elegância do design! A regra de desbloqueio funciona com *qualquer* QC para uma altura maior ou igual à altura bloqueada. Contanto que a rede como um todo esteja progredindo (o que acontecerá com uma maioria honesta), um validador eventualmente verá um QC do futuro que é alto o suficiente para desbloquear seu voto passado, garantindo que ele sempre possa se juntar novamente ao consenso.
+ 
+ ---
+ 
+-## 2.6 State Root Verification
++## 2.4. Propondo Blocos: A Função `on_proposal_timer`
+ 
+-### Problema
++A função `on_proposal_timer` é o marca-passo do motor de consenso. Em vez de ser um simples timeout para mudanças de view, é o gatilho principal para um validador **propor um novo bloco** se ele for o líder atual. É uma função complexa que orquestra a lógica central da criação de blocos.
+ 
+-```
+-Proposer V0 computa state_root especulativamente:
+-state_root = hash(parent_state + certificates)
++Aqui está um detalhamento de suas responsabilidades:
+ 
+-Mas V0 pode estar errado! (bug, ou malicioso)
++1.  **Determinar a Próxima Altura**: Calcula a `next_height` para o novo bloco, que é `latest_qc.height + 1`.
++2.  **Verificar a Liderança**: Verifica se o validador atual é o proponente designado para a `next_height` e o `round` atual usando a fórmula `(height + round) % num_validators`.
++3.  **Verificar o Bloqueio de Voto**: Verifica se o validador já votou na `next_height`. Se sim, ele não pode propor um novo bloco diferente, o que violaria a regra de segurança de bloqueio de voto.
++4.  **Montar o Bloco**: Se todas as verificações passarem, ele reúne transações prontas do Mempool, juntamente com quaisquer `CommitmentProof`s necessários para transações entre shards.
++5.  **Construir e Transmitir**: Constrói o novo `Block` com o `latest_qc` como seu pai e o transmite para a rede.
+ 
+-Validadores V1, V2, V3 precisam verificar:
+-"state_root está correto?"
++```rust
++// Lógica simplificada de on_proposal_timer em crates/bft/src/state.rs
++pub fn on_proposal_timer(
++    &mut self,
++    ready_txs: &ReadyTransactions,
++    // ... outros parâmetros
++) -> Vec<Action> {
++    // 1. Determinar a próxima altura para propor.
++    let next_height = self.latest_qc.as_ref().map_or(self.committed_height + 1, |qc| qc.height.0 + 1);
++    let round = self.view;
++
++    // 2. Verificar se somos o líder para esta altura e round.
++    if !self.should_propose(next_height, round) {
++        return vec![/* Reagendar timer */];
++    }
+ 
+-Mas como?
+-```
++    // 3. Verificar bloqueio de voto: se já votamos nesta altura, não podemos propor um bloco diferente.
++    if self.voted_heights.contains_key(&next_height) {
++        return vec![/* Reagendar timer */];
++    }
+ 
+-### Solução: Async Verification
++    // 4. Montar o conteúdo do bloco.
++    let parent_qc = self.latest_qc.clone().unwrap_or_else(QuorumCertificate::genesis);
++    let transactions = ready_txs.all_transactions(); // Simplificado
+ 
+-```rust
+-// Arquivo: crates/bft/src/state.rs
++    // 5. Construir o novo bloco e transmiti-lo.
++    let new_block = Block::new(parent_qc, next_height, round, transactions, ...);
++    self.broadcast_block(new_block);
+ 
+-fn try_vote_on_block(&mut self, block_hash: Hash, height: u64, round: u64) {
+-    // ... validações anteriores ...
+-    
+-    // Iniciar verificações assíncronas em paralelo
+-    let mut verification_actions = Vec::new();
+-    
+-    // 1. Verificar state_root (se houver certificados)
+-    if self.block_needs_state_root_verification(&block) {
+-        verification_actions
+-            .extend(self.initiate_state_root_verification(block_hash, &block));
+-    }
+-    
+-    // 2. Verificar transaction_root
+-    if self.block_needs_transaction_root_verification(&block) {
+-        verification_actions
+-            .extend(self.initiate_transaction_root_verification(block_hash, &block));
+-    }
+-    
+-    // 3. Verificar cycle proofs
+-    if self.block_needs_cycle_proof_verification(&block) {
+-        verification_actions
+-            .extend(self.initiate_cycle_proof_verification(block_hash, &block));
+-    }
+-    
+-    // Se houver verificações pendentes, aguardar
+-    if !verification_actions.is_empty() {
+-        return verification_actions;
+-    }
+-    
+-    // Todas as verificações passaram → Votar
+-    self.create_vote(block_hash, height, round)
++    vec![/* ... outras ações ... */]
+ }
+ ```
+ 
+-### Fluxo
++### E as Mudanças de View?
+ 
+-```
+-1. Receber bloco com state_root = X
+-2. Iniciar verificação assíncrona (em thread pool)
+-3. Enquanto verifica, continuar processando outros eventos
+-4. Callback: on_state_root_verified()
+-5. Se válido → Votar
+-6. Se inválido → Rejeitar bloco
+-```
++Se um líder falhar em produzir um bloco, outros validadores não receberão uma proposta válida. Após um certo período, um `on_view_change_timer` separado dispara em cada validador. Este é o timer que incrementa a `view` (round) local, fazendo com que os validadores passem para o próximo líder. O `on_proposal_timer` então permite que o *novo* líder construa e proponha um bloco.
+ 
+ ### 🧠 Reflexão
+ 
+-**Pergunta**: Por que não verificar state_root antes de receber o bloco?
++**Pergunta**: Por que o `on_proposal_timer` é tão complexo? Por que não apenas fazer o líder propor um bloco quando quiser?
+ 
+-**Resposta**: Porque você precisa das transações do bloco para computar state_root! Você só pode verificar depois que o bloco está completo.
++**Resposta**: As verificações rigorosas dentro do `on_proposal_timer` são essenciais para a segurança e a liveness do protocolo. Verificar a liderança garante que apenas um validador proponha por vez. Verificar o bloqueio de voto impede que um validador se equivoque e viole a segurança. Determinar a altura a partir do QC mais recente garante que a cadeia sempre se estenda a partir do bloco certificado mais avançado, contribuindo para a liveness.
+ 
+ ---
+ 
+-## ✅ Checkpoint 2: Consenso
+-
+-Você agora entende:
+-- ✅ HotStuff-2 (3 passos)
+-- ✅ Vote locking (segurança)
+-- ✅ Unlock rule (liveness)
+-- ✅ View changes implícitos
+-- ✅ State root verification
+-
+-**Próximo**: Execução distribuída (cross-shard coordination)
+-
+----
+-
+-# 📚 Módulo 3: Execução Distribuída
+-
+-## 3.1 O Problema Cross-Shard
+-
+-### Cenário
+-
+-```
+-Shard 0: Conta A (1000 XRD)
+-Shard 1: Conta B (0 XRD)
++## 2.5. Mantendo o Tempo: Como os Validadores se Mantêm Sincronizados
+ 
+-Transação: "Transferir 100 XRD de A para B"
++Um desafio fundamental em um sistema distribuído é garantir que todos os participantes tenham uma visão aproximadamente sincronizada do estado, neste caso, o `round` (ou `view`) atual. Se os validadores tiverem views locais muito diferentes, eleger um líder e alcançar um quórum se torna impossível.
+ 
+-Problema:
+-- Shard 0 executa: A = 900
+-- Shard 1 executa: B = 100
+-- Mas e se Shard 1 falhar? A fica com 900 e B fica com 0!
+-- INCONSISTÊNCIA! ❌
+-```
++O Hyperscale-rs resolve isso de forma elegante sem um relógio central:
+ 
+-### Solução: Two-Phase Commit (2PC)
++**Sincronização via QCs**: O Quorum Certificate (QC) atua como um "farol de tempo" para toda a rede. Como vimos na função `maybe_unlock_for_qc`, sempre que um validador recebe um QC com um número de round maior que o seu, ele imediatamente avança seu round local para corresponder ao do QC. Como os QCs são transmitidos para todos os validadores, este único mecanismo garante que qualquer validador que fique para trás rapidamente alcançará o resto da rede.
+ 
+-```
+-Fase 1 (Prepare): Shard 0 executa, gera prova
+-Fase 2 (Commit): Shard 1 recebe prova, executa
+-```
++Isso cria um poderoso ciclo de feedback: o progresso (na forma de QCs) impulsiona a sincronização, e a sincronização permite mais progresso.
+ 
+ ---
+ 
+-## 3.2 StateProvision (Fase 1)
+-
+-### Conceito
+-
+-**StateProvision** é uma prova que Shard 0 executou uma transação.
+-
+-```rust
+-// Arquivo: crates/types/src/state_provision.rs
+-
+-pub struct StateProvision {
+-    pub tx_hash: Hash,
+-    pub source_shard: ShardGroupId,
+-    pub target_shard: ShardGroupId,
+-    pub block_height: BlockHeight,
+-    pub block_timestamp: u64,
+-    
+-    // Estado que target shard precisa
+-    pub entries: Vec<StateEntry>,
+-    
+-    // Assinado por validador de source shard
+-    pub signature: Bls12381G2Signature,
+-}
+-```
+-
+-### Fluxo
+-
+-```
+-Shard 0 (source):
+-1. Recebe TX: "Transferir 100 de A para B"
+-2. Executa: A = 900
+-3. Gera StateProvision:
+-   ├─ tx_hash = hash(TX)
+-   ├─ source_shard = 0
+-   ├─ target_shard = 1
+-   ├─ entries = [StateEntry(A, 900)]
+-4. Assina com BLS (DOMAIN_STATE_PROVISION)
+-5. Envia para Shard 1
+-
+-Shard 1 (target):
+-1. Recebe StateProvision
+-2. Valida assinatura (BLS verification)
+-3. Armazena: "TX foi commitada em Shard 0"
+-4. Aguarda CommitmentProof (agregação)
+-```
++## ✅ Checkpoint 2: Protocolo de Consenso
+ 
+-### 🧠 Reflexão
+-
+-**Pergunta**: Por que StateProvision é assinado?
++Você agora entende:
++- ✅ O fluxo básico do HotStuff-2 (proposta, voto, QC)
++- ✅ A regra de duas cadeias para o commit
++- ✅ O bloqueio de voto para segurança
++- ✅ A regra de desbloqueio para liveness
++- ✅ Como as mudanças de view implícitas funcionam
+ 
+-**Resposta**: Para provar que um validador de Shard 0 realmente viu a transação ser executada. Sem assinatura, alguém poderia inventar StateProvisions falsas!
++**Próximo**: Execução de Transações e Máquina de Estados
+ 
+ ---
+ 
+-## 3.3 CommitmentProof (Agregação)
++# 📚 Módulo 3: Execução e Máquina de Estados
+ 
+-### Conceito
++## 3.1 O Problema da Execução
+ 
+-**CommitmentProof** agrega múltiplas StateProvisions em uma única prova.
++Uma vez que um bloco é **commitado**, suas transações precisam ser **executadas** para mudar o estado da aplicação (ex: saldos de contas).
+ 
+-```rust
+-// Arquivo: crates/types/src/proofs.rs
++**Desafio**: A execução deve ser **determinística**. Todos os validadores devem chegar ao **mesmo estado final** após executar as mesmas transações.
+ 
+-pub struct CommitmentProof {
+-    pub tx_hash: Hash,
+-    pub source_shard: ShardGroupId,
+-    
+-    // Quem assinou (bitfield)
+-    pub signers: SignerBitfield,
+-    
+-    // Assinatura agregada
+-    pub aggregated_signature: Bls12381G2Signature,
+-    
+-    pub block_height: BlockHeight,
+-    pub block_timestamp: u64,
+-    
+-    // Estado (único, compartilhado)
+-    pub entries: Arc<Vec<StateEntry>>,
+-}
+ ```
++Estado Inicial: { "alice": 10, "bob": 5 }
++Transação: { "de": "alice", "para": "bob", "valor": 3 }
+ 
+-### Fluxo
+-
+-```
+-Shard 1 recebe múltiplas StateProvisions:
+-├─ StateProvision de V0 (assinado)
+-├─ StateProvision de V1 (assinado)
+-├─ StateProvision de V2 (assinado)
+-└─ StateProvision de V3 (assinado)
+-
+-Agregação:
+-├─ Coleta assinaturas: [S0, S1, S2, S3]
+-├─ Agrega: S_agg = S0 + S1 + S2 + S3
+-├─ Cria CommitmentProof:
+-│  ├─ aggregated_signature = S_agg
+-│  ├─ signers = [1,1,1,1] (bitfield)
+-│  └─ entries = [StateEntry(A, 900)]
+-└─ Inclui em bloco
++Validador 1 executa → Estado Final: { "alice": 7, "bob": 8 }
++Validador 2 executa → Estado Final: { "alice": 7, "bob": 8 } ✅
+ ```
+ 
+-### Benefício: Compressão
++### O que Acontece se a Execução Não é Determinística?
+ 
+-```
+-Sem agregação:
+-- 4 StateProvisions × (64 bytes sig + 100 bytes data) = 656 bytes
+-
+-Com agregação:
+-- 1 CommitmentProof = 48 bytes (sig) + 48 bytes (bitfield) + 100 bytes (data) = 196 bytes
+-
+-Economia: 70%! 🎉
+-```
+-
+-### 🧠 Reflexão
+-
+-**Pergunta**: CommitmentProof agrega assinaturas de Shard 0. Como Shard 1 valida?
+-
+-**Resposta**: 
+-1. Extrai bitfield (quem assinou)
+-2. Coleta chaves públicas dos assinadores de Shard 0
+-3. Verifica assinatura agregada
+-4. Se válida → Quorum de Shard 0 viu a transação
++Se V1 e V2 chegam a estados finais diferentes, o **consenso é quebrado**. A `state_root` em seus próximos blocos propostos será diferente, e eles nunca mais concordarão.
+ 
+ ---
+ 
+-## 3.4 Livelock Detection (Ciclos)
+-
+-### Problema
+-
+-```
+-TX A: Shard 0 → Shard 1
+-TX B: Shard 1 → Shard 0
++## 3.2 Jellyfish Merkle Tree (JMT)
+ 
+-Shard 0 aguarda provision de B (que está em Shard 1)
+-Shard 1 aguarda provision de A (que está em Shard 0)
+-DEADLOCK! ❌
+-```
++O Hyperscale-rs usa uma **Jellyfish Merkle Tree (JMT)** para representar o estado da aplicação. É uma árvore Merkle esparsa otimizada para inserções e atualizações eficientes.
+ 
+-### Visualização
++### Conceito
+ 
++- **Chaves**: Endereços de contas (hashes de 256 bits)
++- **Valores**: Dados da conta (saldo, nonce, etc.)
++- **Caminho**: O caminho da raiz até uma folha é determinado pelos bits da chave.
++
++```
++                 Root
++                 /   \
++                /     \
++               /       \
++              /         \
++             /           \
++            /             \
++           /               \
++          /                 \
++         /                   \
++        /                     \
++       /                       \
++      /                         \
++     /                           \
++    /                             \
++   /                               \
++  /                                 \
++ /                                   \
++Chave: 0110...1011
++Folha: (Chave, Valor)
+ ```
+-Shard 0:
+-├─ TX A: Read(A), Write(B_remote)
+-└─ Aguarda provision de B
+-
+-Shard 1:
+-├─ TX B: Read(B), Write(A_remote)
+-└─ Aguarda provision de A
+ 
+-CICLO: A → B → A
+-```
++### Benefícios
+ 
+-### Solução: Cycle Detection
++- **Raiz de Estado Única**: A raiz da JMT é um hash que representa de forma única todo o estado da aplicação. Qualquer mudança no estado resulta em uma nova raiz.
++- **Provas de Inclusão/Exclusão**: Pode-se provar criptograficamente que uma conta existe (ou não existe) no estado.
++- **Eficiência**: Otimizada para o padrão de acesso de blockchains, onde o estado é grande, mas apenas uma pequena parte é modificada em cada bloco.
+ 
+-```rust
+-// Arquivo: crates/execution/src/cycle_detection.rs
+-
+-pub fn detect_cycle(
+-    tx: &Transaction,
+-    provisions: &HashMap<Hash, StateProvision>,
+-) -> Option<CycleProof> {
+-    // Construir grafo de dependências
+-    let mut graph = DependencyGraph::new();
+-    
+-    for (tx_hash, provision) in provisions {
+-        // Se TX A lê de Shard 1, e TX B escreve para Shard 0
+-        // Então há aresta: A → B
+-        graph.add_edge(tx_hash, ...);
+-    }
+-    
+-    // Detectar ciclo
+-    if let Some(cycle) = graph.find_cycle() {
+-        // Determinar winner (por hash)
+-        let winner = cycle.iter().min_by_key(|tx| tx.hash());
+-        let loser = cycle.iter().max_by_key(|tx| tx.hash());
+-        
+-        // Criar prova assinada por quorum
+-        Some(CycleProof {
+-            winner_tx_hash: winner.hash(),
+-            loser_tx_hash: loser.hash(),
+-            winner_commitment: get_commitment(winner),
+-            aggregated_signature: sign_cycle_proof(...),
+-        })
+-    } else {
+-        None
+-    }
+-}
+-```
+-
+-### Deferral (Adiar Transação)
++### Código Real
+ 
+ ```rust
+-// Arquivo: crates/types/src/transaction.rs
++// Arquivo: crates/executor/src/state.rs
+ 
+-pub struct TransactionDefer {
+-    pub tx_hash: Hash,
+-    pub reason: DeferReason,
+-    pub proof: CycleProof,
+-    pub block_height: BlockHeight,
++// O `State` envolve a JMT
++pub struct State<S: Storage> {
++    tree: JellyfishMerkleTree<S, Blake3Hasher>,
++    version: Version,
+ }
+ 
+-pub enum DeferReason {
+-    LivelockCycle { winner_tx_hash: Hash },
++impl<S: Storage> State<S> {
++    // Aplica um conjunto de escritas (key-value pairs) ao estado
++    pub fn apply(&mut self, writes: &[(Key, Option<Value>)]) -> Result<Hash> {
++        let (new_root, _tree_update) = self
++            .tree
++            .put_value_set(writes, self.version + 1)?;
++        
++        self.version += 1;
++        Ok(new_root)
++    }
+ }
+ ```
+ 
+-### Fluxo
+-
+-```
+-1. Detectar ciclo entre TX A e TX B
+-2. Determinar winner (TX A) e loser (TX B)
+-3. Criar CycleProof (assinado por quorum)
+-4. Incluir TransactionDefer em bloco:
+-   ├─ tx_hash = B
+-   ├─ reason = LivelockCycle { winner = A }
+-   └─ proof = CycleProof
+-5. TX B é adiada (retry com novo hash)
+-6. TX A continua normalmente
+-```
+-
+ ### 🧠 Reflexão
+ 
+-**Pergunta**: Por que TX B recebe novo hash quando é adiada?
++**Pergunta**: Como a `state_root` na `BlockHeader` se relaciona com a JMT?
+ 
+-**Resposta**: Para que ela seja tratada como transação diferente! Sem novo hash, ela teria o mesmo hash e seria rejeitada como duplicada.
++**Resposta**: A `state_root` na `BlockHeader` é exatamente a raiz da JMT após a execução de todas as transações do bloco. Isso serve como uma prova criptográfica do novo estado do sistema.
+ 
+ ---
+ 
+-## ✅ Checkpoint 3: Execução Distribuída
++## 3.3 Execução de Transações
+ 
+-Você agora entende:
+-- ✅ Two-Phase Commit (2PC)
+-- ✅ StateProvision (Fase 1)
+-- ✅ CommitmentProof (Agregação)
+-- ✅ Livelock detection (Ciclos)
+-- ✅ Deferral (Adiar transações)
++O `ExecutionState` é o componente responsável por gerenciar a JMT e executar as transações.
+ 
+-**Próximo**: Padrões de produção
++### Fluxo de Execução
+ 
+----
+-
+-# 📚 Módulo 4: Padrões de Produção
+-
+-## 4.1 State Machine Pattern
+-
+-### Conceito
+-
+-**Toda lógica é síncrona, determinística, sem I/O.**
++1.  **Recebe Bloco Commitado**: O `NodeStateMachine` informa ao `ExecutionState` que um novo bloco foi commitado.
++2.  **Executa Transações**: O `ExecutionState` itera sobre as transações do bloco em ordem determinística.
++3.  **Calcula Efeitos**: Para cada transação, ele calcula as mudanças no estado (os `writes`).
++4.  **Aplica ao Estado**: Passa o conjunto de `writes` para o `State::apply`.
++5.  **Obtém Nova Raiz**: A JMT retorna a nova `state_root`.
++6.  **Verifica Consistência**: O `ExecutionState` compara a `state_root` calculada com a `state_root` na `BlockHeader` do bloco. Se forem iguais, a execução foi bem-sucedida.
+ 
+ ```rust
+-// Arquivo: crates/bft/src/state.rs
++// Lógica simplificada em crates/executor/src/state.rs
+ 
+-pub struct BftStateMachine {
+-    // Estado
+-    pub view: u64,
+-    pub committed_height: u64,
+-    pub voted_heights: HashMap<u64, (Hash, u64)>,
+-    pub pending_blocks: HashMap<Hash, PendingBlock>,
++fn execute_block(&mut self, block: &Block) -> Result<()> {
++    // 1. Coleta todas as transações do bloco
++    let transactions = block.all_transactions();
+     
+-    // Configuração
+-    pub config: BftConfig,
+-}
+-
+-impl BftStateMachine {
+-    pub fn handle(&mut self, event: Event) -> Vec<Action> {
+-        match event {
+-            Event::ProposalTimer => self.on_proposal_timer(),
+-            Event::BlockHeaderReceived { header, ... } => {
+-                self.on_block_header(header, ...)
+-            }
+-            Event::BlockVoteReceived { vote } => {
+-                self.on_block_vote(vote)
+-            }
+-            // ...
+-        }
++    // 2. Executa transações e coleta os writes
++    let mut all_writes = Vec::new();
++    for tx in transactions {
++        let writes = self.execute_transaction(tx)?;
++        all_writes.extend(writes);
+     }
+-}
+-```
+-
+-### Benefícios
+-
+-| Benefício | Descrição |
+-|-----------|-----------|
+-| **Testável** | Sem dependências externas (sem network, storage, timers) |
+-| **Determinístico** | Mesmo estado + evento = mesmas ações |
+-| **Simulável** | Roda em simulação determinística |
+-| **Debugável** | Trace completo de eventos |
+-| **Replicável** | Mesma sequência de eventos = mesmos resultados |
+-
+-### Exemplo
+-
+-```rust
+-#[test]
+-fn test_consensus_advances() {
+-    let mut state = BftStateMachine::new(config);
+     
+-    // Evento 1: Proposal timer
+-    let actions = state.handle(Event::ProposalTimer);
+-    assert!(actions.contains(&Action::BuildProposal { ... }));
++    // 3. Aplica os writes à JMT
++    let calculated_state_root = self.state.apply(&all_writes)?;
+     
+-    // Evento 2: Block header received
+-    let actions = state.handle(Event::BlockHeaderReceived { ... });
+-    assert!(actions.contains(&Action::VerifyQcSignature { ... }));
++    // 4. Verifica se a raiz calculada corresponde à do bloco
++    if calculated_state_root != block.header.state_root {
++        return Err(anyhow!("State root mismatch!"));
++    }
+     
+-    // Evento 3: QC formed
+-    let actions = state.handle(Event::QcFormed { ... });
+-    assert_eq!(state.committed_height, 1);
++    Ok(())
+ }
+ ```
+ 
+ ### 🧠 Reflexão
+ 
+-**Pergunta**: Se state machine é síncrono, como ele lida com I/O (network, storage)?
++**Pergunta**: O que acontece se a `state_root` não corresponder? Isso pode acontecer em um sistema funcionando corretamente?
+ 
+-**Resposta**: Não lida! State machine retorna **Actions** que descrevem o que fazer. Um executor externo executa as actions.
++**Resposta**: Em um sistema com validadores honestos, isso **nunca deveria acontecer**. Uma `state_root` que não corresponde indica um **bug crítico** no protocolo de consenso ou na lógica de execução, ou um **proponente malicioso** que criou um bloco inválido. Um validador honesto rejeitaria tal bloco.
+ 
+ ---
+ 
+-## 4.2 Event Aggregator Pattern
+-
+-### Conceito
+-
+-Um **único task** processa eventos sequencialmente, sem mutex.
+-
+-```rust
+-// Arquivo: crates/production/src/node.rs
+-
+-async fn run_state_machine(
+-    mut state_machine: BftStateMachine,
+-    mut event_rx: mpsc::Receiver<Event>,
+-) {
+-    loop {
+-        // Receber evento
+-        let event = event_rx.recv().await;
+-        
+-        // Processar (síncrono, sem contention)
+-        let actions = state_machine.handle(event);
+-        
+-        // Executar actions (I/O)
+-        for action in actions {
+-            execute_action(action).await;
+-        }
+-    }
+-}
+-```
+-
+-### Múltiplos Produtores
+-
+-```
+-Network Task:
+-├─ Recebe mensagens
+-└─ Envia para event_rx
+-
+-Timer Task:
+-├─ Aguarda timeout
+-└─ Envia para event_rx
+-
+-Storage Task:
+-├─ Lê/escreve dados
+-└─ Envia para event_rx
+-
+-         ↓ (mpsc channel)
+-
+-Event Aggregator:
+-├─ Processa eventos sequencialmente
+-└─ Sem mutex, sem contention
+-```
+-
+-### Benefício: Sem Race Conditions
+-
+-```
+-Sem Event Aggregator (com mutex):
+-├─ Network task tenta adquirir lock
+-├─ Timer task tenta adquirir lock
+-├─ Storage task tenta adquirir lock
+-└─ Contention, deadlock risk
+-
+-Com Event Aggregator:
+-├─ Network task envia evento
+-├─ Timer task envia evento
+-├─ Storage task envia evento
+-└─ Event aggregator processa sequencialmente
+-```
+-
+-### 🧠 Reflexão
++## ✅ Checkpoint 3: Execução e Estado
+ 
+-**Pergunta**: Se event aggregator processa sequencialmente, não é lento?
++Você agora entende:
++- ✅ A necessidade de execução determinística.
++- ✅ Como a Jellyfish Merkle Tree (JMT) é usada para representar o estado.
++- ✅ O fluxo de execução de transações e a verificação da `state_root`.
+ 
+-**Resposta**: Não! Porque cada evento é processado em microsegundos. Mesmo processando sequencialmente, você consegue processar milhares de eventos por segundo.
++**Próximo**: O ciclo de vida completo de uma transação, do início ao fim.
+ 
+ ---
+ 
+-## 4.3 Thread Pool Specialization
+-
+-### Conceito
++# 📚 Módulo 4: O Ciclo de Vida de uma Transação
+ 
+-Diferentes tipos de trabalho → diferentes thread pools.
+-
+-```rust
+-// Arquivo: crates/production/src/thread_pools.rs
++## 4.1 Do Cliente ao Mempool
+ 
+-pub struct ThreadPoolManager {
+-    // Crypto pool: BLS verification, signature checks
+-    crypto_pool: rayon::ThreadPool,
+-    
+-    // Execution pool: Radix Engine, merkle computation
+-    execution_pool: rayon::ThreadPool,
+-    
+-    // I/O pool: tokio runtime for network/storage/timers
+-    io_runtime: tokio::runtime::Runtime,
+-}
+-```
+-
+-### Dispatch
+-
+-```rust
+-fn execute_action(&self, action: Action) {
+-    match action {
+-        Action::VerifyQcSignature { ... } => {
+-            self.crypto_pool.spawn(|| verify_qc_signature(...));
+-        }
+-        Action::ExecuteTransaction { ... } => {
+-            self.execution_pool.spawn(|| execute_transaction(...));
+-        }
+-        Action::SendMessage { ... } => {
+-            self.io_runtime.spawn(async { send_message(...).await });
+-        }
+-    }
+-}
+-```
++1.  **Criação**: Um cliente (ex: uma carteira) cria uma transação, a assina com sua chave privada e a envia para um nó da rede Hyperscale.
++2.  **Recepção no Nó**: O nó recebe a transação via RPC.
++3.  **Validação Básica**: O nó realiza verificações básicas:
++    - A assinatura é válida?
++    - O formato está correto?
++    - O remetente tem saldo suficiente (verificação rápida, não garantida)?
++4.  **Envio ao Mempool**: Se a validação básica passar, a transação é enviada para o `Mempool`.
+ 
+-### Configuração
++---
+ 
+-```rust
+-let config = ThreadPoolConfig::auto();
+-// Auto-detect cores:
+-// - 25% crypto (BLS is CPU-intensive)
+-// - 50% execution (Radix Engine is CPU-intensive)
+-// - 25% I/O (network/storage is I/O-bound)
+-
+-// Ou customizar
+-let config = ThreadPoolConfig::builder()
+-    .crypto_threads(4)
+-    .execution_threads(8)
+-    .io_threads(2)
+-    .pin_cores(true)  // Linux: pin threads to cores
+-    .build()?;
+-```
++## 4.2 A Vida no Mempool
+ 
+-### 🧠 Reflexão
++O `Mempool` é a "sala de espera" para transações que ainda não foram incluídas em um bloco. Sua principal responsabilidade é fornecer um conjunto de transações válidas e prontas para o proponente do próximo bloco.
+ 
+-**Pergunta**: Por que separar crypto e execution pools?
++### Estados de uma Transação no Mempool
+ 
+-**Resposta**: Porque eles têm características diferentes:
+-- **Crypto**: CPU-intensive, parallelizável (batch verification)
+-- **Execution**: CPU-intensive, menos parallelizável (serial execution)
+-- Separar permite otimizar cada um
++- **Pending**: A transação acabou de chegar. O Mempool ainda não a processou totalmente.
++- **Ready**: A transação foi validada e está pronta para ser incluída em um bloco.
++- **Committed**: A transação foi incluída em um bloco que foi **commitado** (mas ainda não executado).
++- **Executed**: A transação foi executada com sucesso.
++- **Aborted**: A transação foi abortada (ex: por um conflito que não pôde ser resolvido).
++- **Deferred**: A transação perdeu uma disputa de conflito e está temporariamente "adiada" até que a transação vencedora seja executada.
+ 
+----
++### Detecção de Conflitos
+ 
+-## 4.4 Batch Processing
++O Mempool usa um `DependencyGraph` para rastrear quais transações acessam quais partes do estado (quais "nós" da JMT). Se duas transações tentam modificar o mesmo nó de estado, há um conflito.
+ 
+-### Batch Verification
++- **Resolução**: O Mempool escolhe um vencedor (geralmente com base na taxa de gás ou outra heurística) e marca o perdedor como `Deferred`.
++- **Retentativa**: Uma vez que a transação vencedora é executada, a transação `Deferred` é movida de volta para o estado `Pending` para ser reavaliada.
+ 
+ ```rust
+-// Arquivo: crates/bft/src/vote_set.rs
+-
+-pub struct VoteSet {
+-    verified_votes: Vec<(usize, BlockVote, u64)>,
+-    unverified_votes: Vec<(usize, BlockVote, PublicKey, u64)>,
+-    pending_verification: bool,
+-}
++// Lógica simplificada em crates/mempool/src/state.rs
+ 
+-impl VoteSet {
+-    pub fn try_build_qc(&mut self) -> Option<Action> {
+-        // Se temos quorum de votos não verificados
+-        if self.unverified_power >= quorum_threshold {
+-            // Batch verify todos
+-            return Some(Action::VerifyAndBuildQuorumCertificate {
+-                votes: self.unverified_votes.clone(),
+-                public_keys: self.collect_public_keys(),
+-            });
++fn process_new_transactions(&mut self) {
++    for tx in self.pending_transactions.drain(..) {
++        // Constrói o grafo de dependências
++        let dependencies = self.dependency_graph.get_dependencies(&tx);
++        
++        if self.has_conflict(dependencies) {
++            // Resolve o conflito, marca um como Deferred
++            self.handle_conflict(tx);
++        } else {
++            // Sem conflitos, move para Ready
++            self.ready_transactions.push(tx);
+         }
+-        None
+     }
+ }
+ ```
+ 
+-### Benefício
+-
+-```
+-Sem batch verification:
+-- Voto 1 chega: Verifica (10ms)
+-- Voto 2 chega: Verifica (10ms)
+-- Voto 3 chega: Verifica (10ms)
+-- Total: 30ms
+-
+-Com batch verification:
+-- Voto 1 chega: Buffer
+-- Voto 2 chega: Buffer
+-- Voto 3 chega: Quorum! Batch verify (15ms)
+-- Total: 15ms
+-
+-Economia: 50%! 🎉
+-```
+-
+-### 🧠 Reflexão
+-
+-**Pergunta**: Por que batch verification é mais rápido?
+-
+-**Resposta**: Porque BLS12-381 batch verification usa operações parallelizáveis. Verificar 3 assinaturas em paralelo é mais rápido que verificar sequencialmente.
+-
+ ---
+ 
+-## 4.5 Deterministic Simulation
++## 4.3 Da Proposta à Execução
+ 
+-### Conceito
+-
+-Simular consenso em ambiente determinístico para testes.
++1.  **Proposta de Bloco**: O `BftState` (líder atual) solicita ao `Mempool` um lote de transações `Ready`.
++2.  **Inclusão no Bloco**: O líder inclui essas transações em um novo bloco e o transmite.
++3.  **Consenso**: O bloco passa pelo processo de consenso do HotStuff-2 (votação, QC, commit).
++4.  **Notificação de Commit**: O `NodeStateMachine` recebe a notificação de que o bloco foi commitado.
++5.  **Notificação ao Mempool**: O `NodeStateMachine` informa ao `Mempool` que as transações no bloco foram commitadas. O Mempool atualiza o estado dessas transações para `Committed`.
++6.  **Execução**: O `NodeStateMachine` envia o bloco para o `ExecutionState`.
++7.  **Execução e Atualização de Estado**: O `ExecutionState` executa as transações e atualiza a JMT.
++8.  **Notificação de Execução**: O `ExecutionState` informa ao `NodeStateMachine` o resultado da execução.
++9.  **Notificação Final ao Mempool**: O `NodeStateMachine` informa ao `Mempool` que as transações foram `Executed` (ou `Aborted`). O Mempool pode então limpar quaisquer dados relacionados a essas transações finalizadas.
+ 
+-```rust
+-// Arquivo: crates/simulation/src/runner.rs
++### Diagrama de Sequência Simplificado
+ 
+-pub struct SimulationRunner {
+-    // Event queue ordenado por: (time, priority, node, sequence)
+-    event_queue: BTreeMap<EventKey, Event>,
+-    
+-    // Nodes (in-process)
+-    nodes: Vec<BftStateMachine>,
+-    
+-    // Storage (in-memory)
+-    storage: SimStorage,
+-    
+-    // Network (simulated latency)
+-    network: SimulatedNetwork,
+-}
+-
+-impl SimulationRunner {
+-    pub fn run_until(&mut self, duration: Duration) {
+-        while self.current_time < duration {
+-            let event = self.event_queue.pop_first();
+-            let actions = self.nodes[event.node].handle(event);
+-            
+-            for action in actions {
+-                self.execute_action(action);
+-            }
+-        }
+-    }
+-}
+ ```
+-
+-### Uso
+-
+-```rust
+-#[test]
+-fn test_consensus_with_latency() {
+-    let config = NetworkConfig {
+-        num_shards: 2,
+-        validators_per_shard: 4,
+-        intra_shard_latency: Duration::from_millis(10),
+-        cross_shard_latency: Duration::from_millis(50),
+-    };
+-    
+-    let mut runner = SimulationRunner::new(config, seed=42);
+-    runner.initialize_genesis();
+-    runner.run_until(Duration::from_secs(10));
+-    
+-    // Verificar resultados
+-    assert_eq!(runner.committed_height(), 100);
+-    assert_eq!(runner.view_changes(), 0);
+-}
++Cliente -> Nó -> Mempool -> BFT (Líder) -> BFT (Validadores) -> NodeStateMachine -> ExecutionState
++   |        |       | (Ready)      | (Proposta)        | (Votos)           | (Commit)           | (Execução)
++   |        |       |              |                   |                   |                    |
++   |        |       └──────────────|-------------------|-------------------> Notifica Mempool (Committed)
++   |        |                      |                   |                   |                    |
++   |        └──────────────────────|-------------------|-------------------|--------------------> Notifica Mempool (Executed)
+ ```
+ 
+-### Determinismo
+-
+-```
+-Seed 42:
+-├─ Run 1: committed_height = 100, view_changes = 0
+-├─ Run 2: committed_height = 100, view_changes = 0
+-└─ Run 3: committed_height = 100, view_changes = 0
+-
+-Seed 43:
+-├─ Run 1: committed_height = 98, view_changes = 1
+-├─ Run 2: committed_height = 98, view_changes = 1
+-└─ Run 3: committed_height = 98, view_changes = 1
+-```
+-
+-### 🧠 Reflexão
+-
+-**Pergunta**: Se simulação é determinística, como testa comportamento com falhas aleatórias?
+-
+-**Resposta**: Usa seed diferente! Seed controla qual nó falha, quando falha, etc. Diferentes seeds = diferentes cenários.
+-
+ ---
+ 
+-## ✅ Checkpoint 4: Produção
++## ✅ Checkpoint 4: Ciclo de Vida Completo
+ 
+-Você agora entende:
+-- ✅ State machine pattern
+-- ✅ Event aggregator pattern
+-- ✅ Thread pool specialization
+-- ✅ Batch processing
+-- ✅ Deterministic simulation
+-
+----
+-
+-# 🎯 Conclusão: Tudo Junto
++Parabéns! Você rastreou uma transação desde sua criação até sua execução final. Você agora tem uma visão completa de como os principais componentes do Hyperscale-rs trabalham juntos.
+ 
+-## Fluxo Completo (Exemplo Prático)
++### O que você aprendeu:
++- Como uma transação entra no sistema.
++- O papel do Mempool na validação e resolução de conflitos.
++- Como os diferentes componentes (`Mempool`, `BftState`, `ExecutionState`, `NodeStateMachine`) se comunicam para mover uma transação através do sistema.
+ 
+-```
+-1. USUÁRIO submete transação
+-   └─ Event: SubmitTransaction
+-
+-2. MEMPOOL recebe transação
+-   └─ Armazena em mempool
+-
+-3. PROPOSER (V0) timeout
+-   └─ Event: ProposalTimer
+-   └─ Action: BuildProposal
+-
+-4. BUILDER computa state_root
+-   └─ Executa certificados
+-   └─ Computa merkle root
+-   └─ Action: BroadcastBlockHeader
+-
+-5. VALIDADORES (V1, V2, V3) recebem header
+-   └─ Event: BlockHeaderReceived
+-   └─ Validam header
+-   └─ Aguardam dados
+-   └─ Action: FetchTransactions
+-
+-6. DADOS chegam via gossip
+-   └─ Bloco completo
+-   └─ Action: VerifyQcSignature (async)
+-
+-7. QC VERIFICADO (callback)
+-   └─ Verificam state_root (async)
+-   └─ Action: VerifyStateRoot (async)
+-
+-8. STATE_ROOT VERIFICADO (callback)
+-   └─ Criam BlockVote
+-   └─ Assinam com BLS
+-   └─ Action: SendBlockVote
+-
+-9. PROPOSER (V0) recebe votos
+-   └─ Event: BlockVoteReceived (3x)
+-   └─ Agrega assinaturas
+-   └─ Action: VerifyAndBuildQuorumCertificate (async, batch)
+-
+-10. QC FORMADO (callback)
+-    └─ Broadcast QC
+-    └─ Bloco em height 0 COMMITADO (two-chain rule)
+-    └─ Event: QcFormed
+-
+-11. EXECUTION coordena
+-    └─ Executa bloco commitado
+-    └─ Gera StateProvisions (cross-shard)
+-    └─ Atualiza JMT
+-
+-12. PRÓXIMO ROUND
+-    └─ Proposer muda
+-    └─ Consenso avança
+-```
++## 🚀 Próximos Passos
+ 
+-## Conceitos Aprendidos
+-
+-| Conceito | Por que Importa |
+-|----------|-----------------|
+-| **Blake3 Hashing** | Prova integridade de dados |
+-| **Merkle Trees** | Prova inclusão de transações |
+-| **BLS12-381** | Assinaturas agregáveis (compressão) |
+-| **Domain Separation** | Previne replay attacks |
+-| **Vote Locking** | Garante segurança (safety) |
+-| **Unlock Rule** | Garante liveness (consenso avança) |
+-| **Two-Chain Rule** | Finality em 2 rounds |
+-| **State Root Verification** | Valida execução |
+-| **CommitmentProof** | Prova cross-shard execution |
+-| **Cycle Detection** | Previne deadlock |
+-| **State Machine Pattern** | Testabilidade e determinismo |
+-| **Event Aggregator** | Sem race conditions |
+-| **Thread Pool Specialization** | Performance |
+-| **Batch Processing** | Compressão de I/O |
+-| **Deterministic Simulation** | Testes confiáveis |
+-
+-## Próximos Passos (Opcional)
+-
+-1. **Ler o código real**: Comece por `crates/types/src/` (tipos)
+-2. **Entender BFT**: Leia `crates/bft/src/state.rs` (consenso)
+-3. **Estudar Execution**: Leia `crates/execution/src/` (execução)
+-4. **Rodar Testes**: `cargo test --all` (validar compreensão)
+-5. **Simular**: Rode `crates/simulation/tests/` (ver em ação)
+-
+-## Recursos Recomendados
+-
+-- **HotStuff Paper**: https://arxiv.org/abs/1803.05069
+-- **BLS12-381**: https://electriccoin.co/blog/bls12-381-zk-proofs/
+-- **Merkle Trees**: https://en.wikipedia.org/wiki/Merkle_tree
+-- **Two-Phase Commit**: https://en.wikipedia.org/wiki/Two-phase_commit_protocol
+-
+----
++Com esta base sólida, você está pronto para explorar tópicos mais avançados no código do Hyperscale-rs:
+ 
+-**Parabéns! Você agora entende os fundamentos de consenso distribuído, criptografia e padrões de produção através do Hyperscale-RS!** 🎉
++- **Execução Cross-Shard**: Como as transações que abrangem múltiplos shards são coordenadas?
++- **Recuperação de Falhas**: O que acontece quando um nó reinicia?
++- **Otimizações de Rede**: Como o gossip e a comunicação de rede são gerenciados?
+ 
++Boa exploração!
++'''

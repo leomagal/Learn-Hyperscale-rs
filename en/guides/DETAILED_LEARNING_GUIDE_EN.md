@@ -154,8 +154,8 @@ Someone claims: "TX2 is in the block"
 Proof path:
 - Hash(TX2) = xyz789
 - Hash(TX1) = def456
-- Hash(TX1 || TX2) = ghi012
-- Hash(ghi012 || Hash(TX3||TX4)) = abc123 ✅ (matches root!)
+- Hash(TX1 | TX2) = ghi012
+- Hash(ghi012 | Hash(TX3|TX4)) = abc123 ✅ (matches root!)
 
 Conclusion: TX2 is definitely in the block
 ```
@@ -245,7 +245,7 @@ pub const DOMAIN_BLOCK_VOTE: &[u8] = b"BLOCK_VOTE";
 pub const DOMAIN_STATE_PROVISION: &[u8] = b"STATE_PROVISION";
 pub const DOMAIN_EXEC_VOTE: &[u8] = b"EXEC_VOTE";
 
-// The actual message that is signed is: DOMAIN_TAG || content
+// The actual message that is signed is: DOMAIN_TAG | content
 fn block_vote_message(
     shard_group: ShardGroupId,
     height: u64,
@@ -266,11 +266,11 @@ fn block_vote_message(
 
 ```
 Validator V1 signs:
-Message = "BLOCK_VOTE" || shard=1 || height=10 || round=0 || hash=abc...
+Message = "BLOCK_VOTE" | shard=1 | height=10 | round=0 | hash=abc...
 Signature = Sign(Message, V1_private_key)
 
 Attacker tries to reuse signature for STATE_PROVISION:
-Message2 = "STATE_PROVISION" || ... (same content)
+Message2 = "STATE_PROVISION" | ... (same content)
 Verification: Verify(Signature, Message2, V1_public_key)
 Result: ❌ FAILS! (Signature is for Message, not Message2)
 ```
@@ -279,12 +279,12 @@ Result: ❌ FAILS! (Signature is for Message, not Message2)
 
 ```
 Without shard in domain:
-- Shard 0 validator signs: "BLOCK_VOTE" || height=10 || ...
+- Shard 0 validator signs: "BLOCK_VOTE" | height=10 | ...
 - Attacker could reuse this signature in Shard 1
 
 With shard in domain:
-- Shard 0 validator signs: "BLOCK_VOTE" || shard=0 || height=10 || ...
-- Shard 1 validator signs: "BLOCK_VOTE" || shard=1 || height=10 || ...
+- Shard 0 validator signs: "BLOCK_VOTE" | shard=0 | height=10 | ...
+- Shard 1 validator signs: "BLOCK_VOTE" | shard=1 | height=10 | ...
 - Signatures are incompatible across shards ✅
 ```
 
@@ -454,122 +454,154 @@ Quorum not reached → Block B rejected ✅
 
 ---
 
-## 2.3. Ensuring Liveness: The Unlock Rule
+## 2.3. Ensuring Liveness: View Synchronization and the Unlock Rule
 
-`Vote Locking` is essential for safety, but it can paralyze consensus if validators become locked on conflicting proposals that never reach quorum. The **Unlock Rule** solves this.
+`Vote Locking` is essential for safety, but it can paralyze consensus if validators become locked on conflicting proposals that never reach quorum. The `maybe_unlock_for_qc` function provides two critical mechanisms to ensure the network remains live.
 
-**Rule**: When a validator sees a QC for height `H`, it knows the decision at height `H` is final. Therefore, it can safely discard all its `voted_heights` for heights `≤ H`.
+**Mechanism 1: View Synchronization**
+If a validator is behind the rest of the network (e.g., it's in round 2, but the network is already in round 5), it needs a way to catch up. When this validator sees a QC from a higher round, it immediately advances its own local view to match the QC's round. This ensures validators stay synchronized with the network's progress.
+
+**Mechanism 2: The Unlock Rule**
+When a validator sees a QC for height `H`, it knows the network has certified a block at that height. It can therefore safely discard its own vote locks for any height `≤ H`. This prevents a validator from being permanently stuck on an old, failed proposal, allowing it to vote for new proposals at higher heights.
 
 ```rust
 // Location: crates/bft/src/state.rs
 fn maybe_unlock_for_qc(&mut self, qc: &QuorumCertificate) {
+    if qc.is_genesis() {
+        return;
+    }
+
+    // Mechanism 1: View Synchronization
+    // Advance our view to match the QC's round, ensuring we keep up with the network.
+    if qc.round > self.view {
+        self.view = qc.round;
+    }
+
+    // Mechanism 2: The Unlock Rule
+    // Find all vote locks for heights at or below the QC's height.
     let qc_height = qc.height.0;
-    // Discard all locks for heights that are now irrelevant.
-    self.voted_heights.retain(|&height, _| height > qc_height);
+    let heights_to_unlock: Vec<u64> = self
+        .voted_heights
+        .keys()
+        .filter(|h| **h <= qc_height)
+        .copied()
+        .collect();
+
+    // Remove the identified locks, freeing the validator to vote in the future.
+    for height in heights_to_unlock {
+        self.voted_heights.remove(&height);
+    }
 }
 ```
 
-### Livelock Scenario Without Unlock Rule
+### How These Mechanisms Prevent Livelock
+
+Let's revisit the scenario where consensus gets stuck.
 
 ```
-Height 10, Round 0:
-V1 votes for Block A → voted_heights[10] = Block A
-V2 votes for Block B → voted_heights[10] = Block B
-V3 offline
+// Initial State: Consensus is stuck at Height 10.
+// V1 is locked on Block A, V2 is locked on Block B.
+// No new blocks can get a QC at this height.
 
-Nope quorum reached (only 2 votes)
-View change to Round 1
+// Liveness in Action:
+// 1. The network continues to make progress at other heights.
+//    Eventually, a QC for a higher height, say QC_11, is formed and broadcast.
 
-Height 10, Round 1:
-V3 proposes Block C
-V1 tries to vote: voted_heights[10] = Block A ≠ Block C → CANNOT vote
-V2 tries to vote: voted_heights[10] = Block B ≠ Block C → CANNOT vote
-V3 votes for Block C
+// 2. V1 and V2 receive QC_11.
+//    They both call maybe_unlock_for_qc(&QC_11).
 
-Only 1 vote → No quorum
-CONSENSUS STUCK! ❌
-```
+// 3. View Synchronization:
+//    V1 and V2 update their local view to match QC_11.round, synchronizing them.
 
-### How Unlock Rule Fixes This
+// 4. Unlock Rule is Applied:
+//    The function collects heights to unlock: h <= 11.
+//    The lock for height 10 is found (since 10 <= 11).
+//    self.voted_heights.remove(&10) is called.
+//    V1 and V2 are now UNLOCKED for height 10. ✅
 
-```
-Height 10, Round 0:
-V1 votes for Block A → voted_heights[10] = Block A
-V2 votes for Block B → voted_heights[10] = Block B
-V3 offline
-
-No quorum reached
-
-Height 9 QC forms (from previous round)
-All validators receive QC 9
-
-Unlock:
-voted_heights.retain(|height, _| height > 9)
-voted_heights[10] is REMOVED! ✅
-
-Height 10, Round 1:
-V3 proposes Block C
-V1 tries to vote: voted_heights[10] = None → CAN vote ✅
-V2 tries to vote: voted_heights[10] = None → CAN vote ✅
-V3 votes for Block C
-
-3 votes → Quorum reached → Consensus advances! ✅
+// 5. Consensus Resumes:
+//    When a new proposal for Height 12 arrives, both V1 and V2 are free to vote,
+//    and the consensus process can continue.
 ```
 
 ### 🧠 Reflection
 
-**Question**: Unlock rule removes locks for heights ≤ qc_height. Why not remove locks for heights < qc_height?
+**Question**: Why is it safe to remove locks for heights `≤ qc_height`?
 
-**Answer**: Because height qc_height is already finalized (two-chain rule), so there's no risk of conflict there. But heights > qc_height can still have conflicts, so we keep the locks.
+**Answer**: Because a QC for height `H` is a cryptographic proof that 2f+1 validators have agreed on a block at that height. This makes the chain up to `H` certified. Any conflicting blocks at those heights can never get a QC due to the quorum intersection property. It is therefore safe to discard old locks, as they no longer contribute to the safety of the consensus.
 
-**Follow-up Question**: What if a validator never sees a QC? Won't it stay locked forever?
+**Follow-up Question**: What if a validator is so far behind it never sees a QC for the height it's locked on?
 
-**Answer**: No! The unlock rule is applied whenever ANY QC is seen, even if it's not for the exact height you're locked on. As long as the network makes progress (which it will with an honest majority), you'll eventually see a QC that unlocks you.
+**Answer**: That's the elegance of the design! The unlock rule works with *any* QC for a height greater than or equal to the locked height. As long as the network as a whole is making progress (which it will with an honest majority), a validator will eventually see a QC from the future that is high enough to unlock its past vote, ensuring it can always rejoin the consensus.
 
 ---
 
-## 2.4. Implicit View Changes
+## 2.4. Proposing Blocks: The `on_proposal_timer` Function
 
-Instead of a complex message protocol to change leaders, HotStuff-2 uses local timeouts. If a proposer fails to produce a block in time, each validator independently advances to the next round. The new leader is determined deterministically by the formula `(height + new_round) % num_validators`.
+The `on_proposal_timer` function is the pacemaker of the consensus engine. Instead of being a simple timeout for view changes, it is the primary trigger for a validator to **propose a new block** if it is the current leader. It is a complex function that orchestrates the core logic of block creation.
 
-This dramatically simplifies the protocol, making it more robust and easier to analyze.
+Here is a breakdown of its responsibilities:
+
+1.  **Determine Next Height**: It calculates the `next_height` for the new block, which is `latest_qc.height + 1`.
+2.  **Check Leadership**: It verifies if the current validator is the designated proposer for the `next_height` and current `round` using the formula `(height + round) % num_validators`.
+3.  **Check Vote Lock**: It checks if the validator has already voted at `next_height`. If so, it cannot propose a new, different block, which would violate the vote locking safety rule.
+4.  **Assemble Block**: If all checks pass, it gathers ready transactions from the Mempool, along with any necessary `CommitmentProof`s for cross-shard transactions.
+5.  **Build and Broadcast**: It constructs the new `Block` with the `latest_qc` as its parent and broadcasts it to the network.
 
 ```rust
-// Location: crates/bft/src/state.rs
-pub fn on_proposal_timer(&mut self) -> Vec<Action> {
-    // If proposer didn't produce block in time
-    self.view += 1;
-    self.view_at_height_start = self.view;
-    
-    // Next proposer changes automatically
-    // proposer = (height + new_round) % num_validators
+// Simplified logic of on_proposal_timer in crates/bft/src/state.rs
+pub fn on_proposal_timer(
+    &mut self,
+    ready_txs: &ReadyTransactions,
+    // ... other parameters
+) -> Vec<Action> {
+    // 1. Determine the next height to propose at.
+    let next_height = self.latest_qc.as_ref().map_or(self.committed_height + 1, |qc| qc.height.0 + 1);
+    let round = self.view;
+
+    // 2. Check if we are the leader for this height and round.
+    if !self.should_propose(next_height, round) {
+        return vec![/* Reschedule timer */];
+    }
+
+    // 3. Check vote lock: if we already voted at this height, we can't propose a different block.
+    if self.voted_heights.contains_key(&next_height) {
+        return vec![/* Reschedule timer */];
+    }
+
+    // 4. Assemble the block's contents.
+    let parent_qc = self.latest_qc.clone().unwrap_or_else(QuorumCertificate::genesis);
+    let transactions = ready_txs.all_transactions(); // Simplified
+
+    // 5. Build the new block and broadcast it.
+    let new_block = Block::new(parent_qc, next_height, round, transactions, ...);
+    self.broadcast_block(new_block);
+
+    vec![/* ... other actions ... */]
 }
 ```
 
-### Example Timeline
+### What About View Changes?
 
-```
-Height 10, Round 0:
-Proposer: (10 + 0) % 4 = V2
-V2 doesn't produce block in time
-
-Timeout (100ms):
-V0 advances: view = 1
-V1 advances: view = 1
-V2 advances: view = 1
-V3 advances: view = 1
-
-Height 10, Round 1:
-Proposer: (10 + 1) % 4 = V3
-V3 proposes block
-Consensus advances
-```
+If a leader fails to produce a block, other validators won't receive a valid proposal. After a certain period, a separate `on_view_change_timer` fires on each validator. This is the timer that increments the local `view` (round), causing the validators to move to the next leader. The `on_proposal_timer` then allows the *new* leader to build and propose a block.
 
 ### 🧠 Reflection
 
-**Question**: If each validator advances its round locally, how do they synchronize?
+**Question**: Why is the `on_proposal_timer` so complex? Why not just have the leader propose a block whenever it wants?
 
-**Answer**: Via **QCs**! When you receive a QC in round R, you know the quorum is in round R, so you advance to round R+1. This ensures all validators stay roughly synchronized.
+**Answer**: The strict checks within `on_proposal_timer` are essential for the safety and liveness of the protocol. Checking leadership ensures only one validator proposes at a time. Checking the vote lock prevents a validator from equivocating and violating safety. Determining the height from the latest QC ensures the chain always extends from the most advanced certified block, contributing to liveness.
+
+---
+
+## 2.5. Keeping Time: How Validators Stay Synchronized
+
+A key challenge in a distributed system is ensuring all participants have a roughly synchronized view of the state, in this case, the current `round` (or `view`). If validators have wildly different local views, electing a leader and reaching a quorum becomes impossible.
+
+Hyperscale-rs solves this elegantly without a central clock:
+
+**Synchronization via QCs**: The Quorum Certificate (QC) acts as a network-wide "beacon of time". As we saw in the `maybe_unlock_for_qc` function, whenever a validator receives a QC with a round number higher than its own, it immediately fast-forwards its local round to match the QC's round. Since QCs are broadcast to all validators, this single mechanism ensures that any validator that falls behind will quickly catch up to the rest of the network.
+
+This creates a powerful feedback loop: progress (in the form of QCs) drives synchronization, and synchronization enables further progress.
 
 ---
 

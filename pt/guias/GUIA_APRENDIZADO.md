@@ -1,4 +1,4 @@
-# 🎓 Guia de Aprendizado: Hyperscale-RS
+'''# 🎓 Guia de Aprendizado: Hyperscale-RS
 
 ## Introdução
 
@@ -161,8 +161,8 @@ Alguém diz: "TX2 está no bloco"
 Prova:
 - Hash(TX2) = xyz789
 - Hash(TX1) = def456
-- Hash(TX1 || TX2) = ghi012
-- Hash(ghi012 || TX3) = abc123 ✅ (match root!)
+- Hash(TX1 | TX2) = ghi012
+- Hash(ghi012 | TX3) = abc123 ✅ (match root!)
 
 Conclusão: TX2 definitivamente está no bloco
 ```
@@ -277,7 +277,7 @@ pub const DOMAIN_BLOCK_VOTE: &[u8] = b"BLOCK_VOTE";
 pub const DOMAIN_STATE_PROVISION: &[u8] = b"STATE_PROVISION";
 pub const DOMAIN_EXEC_VOTE: &[u8] = b"EXEC_VOTE";
 
-// Mensagem assinada = DOMAIN_TAG || conteúdo
+// Mensagem assinada = DOMAIN_TAG | conteúdo
 fn block_vote_message(
     shard_group: ShardGroupId,
     height: u64,
@@ -298,11 +298,11 @@ fn block_vote_message(
 
 ```
 Validador V1 assina:
-Message = "BLOCK_VOTE" || shard=1 || height=10 || round=0 || hash=abc...
+Message = "BLOCK_VOTE" | shard=1 | height=10 | round=0 | hash=abc...
 Signature = Sign(Message, V1_private_key)
 
 Atacante tenta reusar assinatura para STATE_PROVISION:
-Message2 = "STATE_PROVISION" || ... (mesmo conteúdo)
+Message2 = "STATE_PROVISION" | ... (mesmo conteúdo)
 Verificação: Verify(Signature, Message2, V1_public_key)
 Resultado: ❌ FALHA! (Signature é para Message, não Message2)
 ```
@@ -505,1025 +505,419 @@ Height 1:
 
 ---
 
-## 2.3 Vote Locking (Segurança)
+## 2.3. Segurança e Liveness: Bloqueio de Voto e a Regra de Desbloqueio
 
-### Problema
+Para garantir a segurança, o HotStuff-2 usa uma regra de **Bloqueio de Voto (Vote Locking)**: uma vez que um validador vota em um bloco a uma certa altura, ele não pode votar em um bloco *diferente* na mesma altura. Isso previne que um validador malicioso vote em duas cadeias conflitantes.
 
-```
-Height 10, Round 0:
-V0 propõe Block A
-V1 vota em Block A
-V2 vota em Block A
-V3 offline
+No entanto, essa regra sozinha pode travar o consenso (um problema de **Liveness**). Se validadores diferentes se bloquearem em blocos conflitantes que nunca atingem um quórum, ninguém consegue mais votar. A função `maybe_unlock_for_qc` resolve isso com dois mecanismos cruciais.
 
-Round 0 timeout → View change para Round 1
+**Mecanismo 1: Sincronização de View (Round)**
+Se um validador fica para trás, ele precisa se atualizar. Ao ver um QC com um `round` (ou `view`) mais alto que o seu, ele imediatamente avança seu `view` local para corresponder ao do QC, mantendo-se sincronizado com a rede.
 
-Height 10, Round 1:
-V3 (novo proposer) propõe Block B (diferente!)
-V1 quer votar em Block B
-V2 quer votar em Block B
-
-Resultado: Dois blocos diferentes em height 10!
-VIOLAÇÃO DE SEGURANÇA! ❌
-```
-
-### Solução: Vote Locking
+**Mecanismo 2: A Regra de Desbloqueio (Unlock Rule)**
+Ao ver um QC para a altura `H`, um validador sabe que a rede certificou um bloco naquela altura. Portanto, é seguro descartar seus bloqueios de voto para qualquer altura `≤ H`, permitindo que ele volte a participar do consenso.
 
 ```rust
-// Arquivo: crates/bft/src/state.rs
-
-pub voted_heights: HashMap<u64, (Hash, u64)>
-
-// Quando votamos em um bloco:
-fn try_vote_on_block(&mut self, block_hash: Hash, height: u64, round: u64) {
-    // Verificar se já votamos em altura
-    if let Some(&(existing_hash, _)) = self.voted_heights.get(&height) {
-        if existing_hash != block_hash {
-            // Já votamos em outro bloco → NÃO VOTAMOS
-            debug!("Vote locking: already voted for different block");
-            return vec![];
-        }
-    }
-    
-    // Registrar voto
-    self.voted_heights.insert(height, (block_hash, round));
-    
-    // Criar e enviar BlockVote
-    self.create_vote(block_hash, height, round)
-}
-```
-
-### Como Funciona
-
-```
-Height 10, Round 0:
-V1 vota em Block A
-voted_heights[10] = (Block A, round 0)
-
-Height 10, Round 1:
-V3 propõe Block B
-V1 recebe Block B
-V1 tenta votar em Block B
-Verificação: voted_heights[10] = (Block A, round 0) ≠ Block B
-Resultado: V1 NÃO vota em Block B ✅ (safety preserved)
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Vote locking previne que V1 vote em Block B. Mas e se Block B é realmente melhor? Consenso não fica travado?
-
-**Resposta**: Boa pergunta! Vamos ver a solução: **Unlock rule**.
-
----
-
-## 2.4 Unlock Rule (Liveness)
-
-### Problema
-
-```
-Height 10, Round 0:
-V1 vota em Block A → voted_heights[10] = Block A
-V2 vota em Block B → voted_heights[10] = Block B
-V3 offline
-
-Nenhum atinge quorum (só 2 votos)
-View change para Round 1
-
-Height 10, Round 1:
-V3 propõe Block C
-V1 quer votar em Block C
-V1 tenta: voted_heights[10] = Block A ≠ Block C
-V1 NÃO vota
-
-V2 quer votar em Block C
-V2 tenta: voted_heights[10] = Block B ≠ Block C
-V2 NÃO vota
-
-V3 vota em Block C (1 voto)
-CONSENSO TRAVADO! ❌
-```
-
-### Solução: Unlock Rule
-
-```rust
-// Arquivo: crates/bft/src/state.rs
-
+// Localização: crates/bft/src/state.rs
 fn maybe_unlock_for_qc(&mut self, qc: &QuorumCertificate) {
+    if qc.is_genesis() {
+        return;
+    }
+
+    // Mecanismo 1: Sincronização de View
+    // Avança nossa view para corresponder à do QC, garantindo que acompanhemos a rede.
+    if qc.round > self.view {
+        self.view = qc.round;
+    }
+
+    // Mecanismo 2: A Regra de Desbloqueio
+    // Encontra todos os bloqueios de voto para alturas iguais ou inferiores à do QC.
     let qc_height = qc.height.0;
-    
-    // Remover locks em alturas ≤ qc_height
-    self.voted_heights.retain(|&height, _| height > qc_height);
+    let heights_to_unlock: Vec<u64> = self
+        .voted_heights
+        .keys()
+        .filter(|h| **h <= qc_height)
+        .copied()
+        .collect();
+
+    // Remove os bloqueios identificados, liberando o validador para votar no futuro.
+    for height in heights_to_unlock {
+        self.voted_heights.remove(&height);
+    }
 }
 ```
 
-### Como Funciona
+### Como Isso Evita o Travamento (Livelock)
+
+Vamos revisitar o cenário onde o consenso trava:
 
 ```
-Height 10, Round 0:
-V1 vota em Block A → voted_heights[10] = Block A
-V2 vota em Block B → voted_heights[10] = Block B
-Nenhum atinge quorum
+// Estado Inicial: Consenso travado na Altura 10.
+// V1 está bloqueado no Bloco A, V2 está bloqueado no Bloco B.
+// Nenhum novo bloco consegue um QC nesta altura.
 
-Height 9 QC forma (de round anterior)
-Todos recebem QC 9
+// Liveness em Ação:
+// 1. A rede continua a progredir em outras alturas.
+//    Eventualmente, um QC para uma altura maior, digamos QC_11, é formado e transmitido.
 
-Unlock:
-voted_heights.retain(|height, _| height > 9)
-voted_heights[10] é removido! ✅
+// 2. V1 e V2 recebem o QC_11.
+//    Ambos chamam a função maybe_unlock_for_qc(&QC_11).
 
-Height 10, Round 1:
-V3 propõe Block C
-V1 tenta votar: voted_heights[10] = None
-V1 PODE votar em Block C! ✅
-V2 tenta votar: voted_heights[10] = None
-V2 PODE votar em Block C! ✅
-V3 vota em Block C
+// 3. Sincronização de View:
+//    V1 e V2 atualizam sua view local para corresponder a QC_11.round, sincronizando-se.
 
-3 votos → Quorum → Consenso avança! ✅
+// 4. Regra de Desbloqueio é Aplicada:
+//    A função coleta as alturas para desbloquear: h <= 11.
+//    O bloqueio para a altura 10 é encontrado (pois 10 <= 11).
+//    self.voted_heights.remove(&10) é chamado.
+//    V1 e V2 estão agora DESBLOQUEADOS para a altura 10. ✅
+
+// 5. Consenso Retoma:
+//    Quando uma nova proposta para a Altura 12 chegar, tanto V1 quanto V2 estarão livres para votar,
+//    e o processo de consenso pode continuar.
 ```
 
 ### 🧠 Reflexão
 
-**Pergunta**: Unlock rule remove locks em alturas ≤ qc_height. Por que não remover locks em alturas < qc_height?
+**Pergunta**: Por que é seguro remover bloqueios para alturas `≤ qc_height`?
 
-**Resposta**: Porque altura qc_height já foi commitada (two-chain rule), então não há risco de conflito nela. Mas alturas > qc_height ainda podem ter conflitos, então mantemos os locks.
+**Resposta**: Porque um QC para a altura `H` é uma prova criptográfica de que 2f+1 validadores concordaram com um bloco naquela altura. Isso torna a cadeia até `H` certificada. Qualquer bloco conflitante nessas alturas nunca conseguirá um QC devido à propriedade de interseção de quórum. Portanto, é seguro descartar bloqueios antigos, pois eles não contribuem mais para a segurança do consenso.
+
+**Pergunta de Acompanhamento**: E se um validador estiver tão atrasado que nunca vê um QC para a altura em que está bloqueado?
+
+**Resposta**: Essa é a elegância do design! A regra de desbloqueio funciona com *qualquer* QC para uma altura maior ou igual à altura bloqueada. Contanto que a rede como um todo esteja progredindo (o que acontecerá com uma maioria honesta), um validador eventualmente verá um QC do futuro que é alto o suficiente para desbloquear seu voto passado, garantindo que ele sempre possa se juntar novamente ao consenso.
 
 ---
 
-## 2.5 View Changes (Implicit)
+## 2.4. Propondo Blocos: A Função `on_proposal_timer`
 
-### Conceito
+A função `on_proposal_timer` é o marca-passo do motor de consenso. Em vez de ser um simples timeout para mudanças de view, é o gatilho principal para um validador **propor um novo bloco** se ele for o líder atual. É uma função complexa que orquestra a lógica central da criação de blocos.
 
-**HotStuff-2 usa view changes implícitos**: Cada validador avança seu round localmente no timeout.
+Aqui está um detalhamento de suas responsabilidades:
+
+1.  **Determinar a Próxima Altura**: Calcula a `next_height` para o novo bloco, que é `latest_qc.height + 1`.
+2.  **Verificar a Liderança**: Verifica se o validador atual é o proponente designado para a `next_height` e o `round` atual usando a fórmula `(height + round) % num_validators`.
+3.  **Verificar o Bloqueio de Voto**: Verifica se o validador já votou na `next_height`. Se sim, ele não pode propor um novo bloco diferente, o que violaria a regra de segurança de bloqueio de voto.
+4.  **Montar o Bloco**: Se todas as verificações passarem, ele reúne transações prontas do Mempool, juntamente com quaisquer `CommitmentProof`s necessários para transações entre shards.
+5.  **Construir e Transmitir**: Constrói o novo `Block` com o `latest_qc` como seu pai e o transmite para a rede.
 
 ```rust
-// Arquivo: crates/bft/src/state.rs
+// Lógica simplificada de on_proposal_timer em crates/bft/src/state.rs
+pub fn on_proposal_timer(
+    &mut self,
+    ready_txs: &ReadyTransactions,
+    // ... outros parâmetros
+) -> Vec<Action> {
+    // 1. Determinar a próxima altura para propor.
+    let next_height = self.latest_qc.as_ref().map_or(self.committed_height + 1, |qc| qc.height.0 + 1);
+    let round = self.view;
 
-pub fn on_proposal_timer(&mut self) -> Vec<Action> {
-    // Se proposer não produziu bloco em tempo
-    self.view += 1;
-    self.view_at_height_start = self.view;
-    
-    // Próximo proposer muda automaticamente
-    // proposer = (height + new_round) % num_validators
+    // 2. Verificar se somos o líder para esta altura e round.
+    if !self.should_propose(next_height, round) {
+        return vec![/* Reagendar timer */];
+    }
+
+    // 3. Verificar bloqueio de voto: se já votamos nesta altura, não podemos propor um bloco diferente.
+    if self.voted_heights.contains_key(&next_height) {
+        return vec![/* Reagendar timer */];
+    }
+
+    // 4. Montar o conteúdo do bloco.
+    let parent_qc = self.latest_qc.clone().unwrap_or_else(QuorumCertificate::genesis);
+    let transactions = ready_txs.all_transactions(); // Simplificado
+
+    // 5. Construir o novo bloco e transmiti-lo.
+    let new_block = Block::new(parent_qc, next_height, round, transactions, ...);
+    self.broadcast_block(new_block);
+
+    vec![/* ... outras ações ... */]
 }
 ```
 
-### Exemplo
+### E as Mudanças de View?
 
-```
-Height 10, Round 0:
-Proposer: (10 + 0) % 4 = V2
-V2 não produz bloco em tempo
-
-Timeout (100ms):
-V0 avança: view = 1
-V1 avança: view = 1
-V2 avança: view = 1
-V3 avança: view = 1
-
-Height 10, Round 1:
-Proposer: (10 + 1) % 4 = V3
-V3 propõe bloco
-Consenso avança
-```
-
-### Benefício: Sem Protocolo Separado
-
-```
-HotStuff original:
-├─ Protocolo de consenso
-├─ Protocolo de view change (separado)
-└─ Protocolo de sincronização
-
-HotStuff-2:
-├─ Protocolo de consenso
-├─ View changes implícitos (sem protocolo)
-└─ Sincronização via QCs
-```
+Se um líder falhar em produzir um bloco, outros validadores não receberão uma proposta válida. Após um certo período, um `on_view_change_timer` separado dispara em cada validador. Este é o timer que incrementa a `view` (round) local, fazendo com que os validadores passem para o próximo líder. O `on_proposal_timer` então permite que o *novo* líder construa e proponha um bloco.
 
 ### 🧠 Reflexão
 
-**Pergunta**: Se cada validador avança seu round localmente, como eles sincronizam?
+**Pergunta**: Por que o `on_proposal_timer` é tão complexo? Por que não apenas fazer o líder propor um bloco quando quiser?
 
-**Resposta**: Via **QCs**! Quando você recebe QC em round R, você sabe que quorum está em round R, então você avança para round R+1.
-
----
-
-## 2.6 State Root Verification
-
-### Problema
-
-```
-Proposer V0 computa state_root especulativamente:
-state_root = hash(parent_state + certificates)
-
-Mas V0 pode estar errado! (bug, ou malicioso)
-
-Validadores V1, V2, V3 precisam verificar:
-"state_root está correto?"
-
-Mas como?
-```
-
-### Solução: Async Verification
-
-```rust
-// Arquivo: crates/bft/src/state.rs
-
-fn try_vote_on_block(&mut self, block_hash: Hash, height: u64, round: u64) {
-    // ... validações anteriores ...
-    
-    // Iniciar verificações assíncronas em paralelo
-    let mut verification_actions = Vec::new();
-    
-    // 1. Verificar state_root (se houver certificados)
-    if self.block_needs_state_root_verification(&block) {
-        verification_actions
-            .extend(self.initiate_state_root_verification(block_hash, &block));
-    }
-    
-    // 2. Verificar transaction_root
-    if self.block_needs_transaction_root_verification(&block) {
-        verification_actions
-            .extend(self.initiate_transaction_root_verification(block_hash, &block));
-    }
-    
-    // 3. Verificar cycle proofs
-    if self.block_needs_cycle_proof_verification(&block) {
-        verification_actions
-            .extend(self.initiate_cycle_proof_verification(block_hash, &block));
-    }
-    
-    // Se houver verificações pendentes, aguardar
-    if !verification_actions.is_empty() {
-        return verification_actions;
-    }
-    
-    // Todas as verificações passaram → Votar
-    self.create_vote(block_hash, height, round)
-}
-```
-
-### Fluxo
-
-```
-1. Receber bloco com state_root = X
-2. Iniciar verificação assíncrona (em thread pool)
-3. Enquanto verifica, continuar processando outros eventos
-4. Callback: on_state_root_verified()
-5. Se válido → Votar
-6. Se inválido → Rejeitar bloco
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Por que não verificar state_root antes de receber o bloco?
-
-**Resposta**: Porque você precisa das transações do bloco para computar state_root! Você só pode verificar depois que o bloco está completo.
+**Resposta**: As verificações rigorosas dentro do `on_proposal_timer` são essenciais para a segurança e a liveness do protocolo. Verificar a liderança garante que apenas um validador proponha por vez. Verificar o bloqueio de voto impede que um validador se equivoque e viole a segurança. Determinar a altura a partir do QC mais recente garante que a cadeia sempre se estenda a partir do bloco certificado mais avançado, contribuindo para a liveness.
 
 ---
 
-## ✅ Checkpoint 2: Consenso
+## 2.5. Mantendo o Tempo: Como os Validadores se Mantêm Sincronizados
+
+Um desafio fundamental em um sistema distribuído é garantir que todos os participantes tenham uma visão aproximadamente sincronizada do estado, neste caso, o `round` (ou `view`) atual. Se os validadores tiverem views locais muito diferentes, eleger um líder e alcançar um quórum se torna impossível.
+
+O Hyperscale-rs resolve isso de forma elegante sem um relógio central:
+
+**Sincronização via QCs**: O Quorum Certificate (QC) atua como um "farol de tempo" para toda a rede. Como vimos na função `maybe_unlock_for_qc`, sempre que um validador recebe um QC com um número de round maior que o seu, ele imediatamente avança seu round local para corresponder ao do QC. Como os QCs são transmitidos para todos os validadores, este único mecanismo garante que qualquer validador que fique para trás rapidamente alcançará o resto da rede.
+
+Isso cria um poderoso ciclo de feedback: o progresso (na forma de QCs) impulsiona a sincronização, e a sincronização permite mais progresso.
+
+---
+
+## ✅ Checkpoint 2: Protocolo de Consenso
 
 Você agora entende:
-- ✅ HotStuff-2 (3 passos)
-- ✅ Vote locking (segurança)
-- ✅ Unlock rule (liveness)
-- ✅ View changes implícitos
-- ✅ State root verification
+- ✅ O fluxo básico do HotStuff-2 (proposta, voto, QC)
+- ✅ A regra de duas cadeias para o commit
+- ✅ O bloqueio de voto para segurança
+- ✅ A regra de desbloqueio para liveness
+- ✅ Como as mudanças de view implícitas funcionam
 
-**Próximo**: Execução distribuída (cross-shard coordination)
-
----
-
-# 📚 Módulo 3: Execução Distribuída
-
-## 3.1 O Problema Cross-Shard
-
-### Cenário
-
-```
-Shard 0: Conta A (1000 XRD)
-Shard 1: Conta B (0 XRD)
-
-Transação: "Transferir 100 XRD de A para B"
-
-Problema:
-- Shard 0 executa: A = 900
-- Shard 1 executa: B = 100
-- Mas e se Shard 1 falhar? A fica com 900 e B fica com 0!
-- INCONSISTÊNCIA! ❌
-```
-
-### Solução: Two-Phase Commit (2PC)
-
-```
-Fase 1 (Prepare): Shard 0 executa, gera prova
-Fase 2 (Commit): Shard 1 recebe prova, executa
-```
+**Próximo**: Execução de Transações e Máquina de Estados
 
 ---
 
-## 3.2 StateProvision (Fase 1)
+# 📚 Módulo 3: Execução e Máquina de Estados
+
+## 3.1 O Problema da Execução
+
+Uma vez que um bloco é **commitado**, suas transações precisam ser **executadas** para mudar o estado da aplicação (ex: saldos de contas).
+
+**Desafio**: A execução deve ser **determinística**. Todos os validadores devem chegar ao **mesmo estado final** após executar as mesmas transações.
+
+```
+Estado Inicial: { "alice": 10, "bob": 5 }
+Transação: { "de": "alice", "para": "bob", "valor": 3 }
+
+Validador 1 executa → Estado Final: { "alice": 7, "bob": 8 }
+Validador 2 executa → Estado Final: { "alice": 7, "bob": 8 } ✅
+```
+
+### O que Acontece se a Execução Não é Determinística?
+
+Se V1 e V2 chegam a estados finais diferentes, o **consenso é quebrado**. A `state_root` em seus próximos blocos propostos será diferente, e eles nunca mais concordarão.
+
+---
+
+## 3.2 Jellyfish Merkle Tree (JMT)
+
+O Hyperscale-rs usa uma **Jellyfish Merkle Tree (JMT)** para representar o estado da aplicação. É uma árvore Merkle esparsa otimizada para inserções e atualizações eficientes.
 
 ### Conceito
 
-**StateProvision** é uma prova que Shard 0 executou uma transação.
-
-```rust
-// Arquivo: crates/types/src/state_provision.rs
-
-pub struct StateProvision {
-    pub tx_hash: Hash,
-    pub source_shard: ShardGroupId,
-    pub target_shard: ShardGroupId,
-    pub block_height: BlockHeight,
-    pub block_timestamp: u64,
-    
-    // Estado que target shard precisa
-    pub entries: Vec<StateEntry>,
-    
-    // Assinado por validador de source shard
-    pub signature: Bls12381G2Signature,
-}
-```
-
-### Fluxo
+- **Chaves**: Endereços de contas (hashes de 256 bits)
+- **Valores**: Dados da conta (saldo, nonce, etc.)
+- **Caminho**: O caminho da raiz até uma folha é determinado pelos bits da chave.
 
 ```
-Shard 0 (source):
-1. Recebe TX: "Transferir 100 de A para B"
-2. Executa: A = 900
-3. Gera StateProvision:
-   ├─ tx_hash = hash(TX)
-   ├─ source_shard = 0
-   ├─ target_shard = 1
-   ├─ entries = [StateEntry(A, 900)]
-4. Assina com BLS (DOMAIN_STATE_PROVISION)
-5. Envia para Shard 1
-
-Shard 1 (target):
-1. Recebe StateProvision
-2. Valida assinatura (BLS verification)
-3. Armazena: "TX foi commitada em Shard 0"
-4. Aguarda CommitmentProof (agregação)
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Por que StateProvision é assinado?
-
-**Resposta**: Para provar que um validador de Shard 0 realmente viu a transação ser executada. Sem assinatura, alguém poderia inventar StateProvisions falsas!
-
----
-
-## 3.3 CommitmentProof (Agregação)
-
-### Conceito
-
-**CommitmentProof** agrega múltiplas StateProvisions em uma única prova.
-
-```rust
-// Arquivo: crates/types/src/proofs.rs
-
-pub struct CommitmentProof {
-    pub tx_hash: Hash,
-    pub source_shard: ShardGroupId,
-    
-    // Quem assinou (bitfield)
-    pub signers: SignerBitfield,
-    
-    // Assinatura agregada
-    pub aggregated_signature: Bls12381G2Signature,
-    
-    pub block_height: BlockHeight,
-    pub block_timestamp: u64,
-    
-    // Estado (único, compartilhado)
-    pub entries: Arc<Vec<StateEntry>>,
-}
-```
-
-### Fluxo
-
-```
-Shard 1 recebe múltiplas StateProvisions:
-├─ StateProvision de V0 (assinado)
-├─ StateProvision de V1 (assinado)
-├─ StateProvision de V2 (assinado)
-└─ StateProvision de V3 (assinado)
-
-Agregação:
-├─ Coleta assinaturas: [S0, S1, S2, S3]
-├─ Agrega: S_agg = S0 + S1 + S2 + S3
-├─ Cria CommitmentProof:
-│  ├─ aggregated_signature = S_agg
-│  ├─ signers = [1,1,1,1] (bitfield)
-│  └─ entries = [StateEntry(A, 900)]
-└─ Inclui em bloco
-```
-
-### Benefício: Compressão
-
-```
-Sem agregação:
-- 4 StateProvisions × (64 bytes sig + 100 bytes data) = 656 bytes
-
-Com agregação:
-- 1 CommitmentProof = 48 bytes (sig) + 48 bytes (bitfield) + 100 bytes (data) = 196 bytes
-
-Economia: 70%! 🎉
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: CommitmentProof agrega assinaturas de Shard 0. Como Shard 1 valida?
-
-**Resposta**: 
-1. Extrai bitfield (quem assinou)
-2. Coleta chaves públicas dos assinadores de Shard 0
-3. Verifica assinatura agregada
-4. Se válida → Quorum de Shard 0 viu a transação
-
----
-
-## 3.4 Livelock Detection (Ciclos)
-
-### Problema
-
-```
-TX A: Shard 0 → Shard 1
-TX B: Shard 1 → Shard 0
-
-Shard 0 aguarda provision de B (que está em Shard 1)
-Shard 1 aguarda provision de A (que está em Shard 0)
-DEADLOCK! ❌
-```
-
-### Visualização
-
-```
-Shard 0:
-├─ TX A: Read(A), Write(B_remote)
-└─ Aguarda provision de B
-
-Shard 1:
-├─ TX B: Read(B), Write(A_remote)
-└─ Aguarda provision de A
-
-CICLO: A → B → A
-```
-
-### Solução: Cycle Detection
-
-```rust
-// Arquivo: crates/execution/src/cycle_detection.rs
-
-pub fn detect_cycle(
-    tx: &Transaction,
-    provisions: &HashMap<Hash, StateProvision>,
-) -> Option<CycleProof> {
-    // Construir grafo de dependências
-    let mut graph = DependencyGraph::new();
-    
-    for (tx_hash, provision) in provisions {
-        // Se TX A lê de Shard 1, e TX B escreve para Shard 0
-        // Então há aresta: A → B
-        graph.add_edge(tx_hash, ...);
-    }
-    
-    // Detectar ciclo
-    if let Some(cycle) = graph.find_cycle() {
-        // Determinar winner (por hash)
-        let winner = cycle.iter().min_by_key(|tx| tx.hash());
-        let loser = cycle.iter().max_by_key(|tx| tx.hash());
-        
-        // Criar prova assinada por quorum
-        Some(CycleProof {
-            winner_tx_hash: winner.hash(),
-            loser_tx_hash: loser.hash(),
-            winner_commitment: get_commitment(winner),
-            aggregated_signature: sign_cycle_proof(...),
-        })
-    } else {
-        None
-    }
-}
-```
-
-### Deferral (Adiar Transação)
-
-```rust
-// Arquivo: crates/types/src/transaction.rs
-
-pub struct TransactionDefer {
-    pub tx_hash: Hash,
-    pub reason: DeferReason,
-    pub proof: CycleProof,
-    pub block_height: BlockHeight,
-}
-
-pub enum DeferReason {
-    LivelockCycle { winner_tx_hash: Hash },
-}
-```
-
-### Fluxo
-
-```
-1. Detectar ciclo entre TX A e TX B
-2. Determinar winner (TX A) e loser (TX B)
-3. Criar CycleProof (assinado por quorum)
-4. Incluir TransactionDefer em bloco:
-   ├─ tx_hash = B
-   ├─ reason = LivelockCycle { winner = A }
-   └─ proof = CycleProof
-5. TX B é adiada (retry com novo hash)
-6. TX A continua normalmente
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Por que TX B recebe novo hash quando é adiada?
-
-**Resposta**: Para que ela seja tratada como transação diferente! Sem novo hash, ela teria o mesmo hash e seria rejeitada como duplicada.
-
----
-
-## ✅ Checkpoint 3: Execução Distribuída
-
-Você agora entende:
-- ✅ Two-Phase Commit (2PC)
-- ✅ StateProvision (Fase 1)
-- ✅ CommitmentProof (Agregação)
-- ✅ Livelock detection (Ciclos)
-- ✅ Deferral (Adiar transações)
-
-**Próximo**: Padrões de produção
-
----
-
-# 📚 Módulo 4: Padrões de Produção
-
-## 4.1 State Machine Pattern
-
-### Conceito
-
-**Toda lógica é síncrona, determinística, sem I/O.**
-
-```rust
-// Arquivo: crates/bft/src/state.rs
-
-pub struct BftStateMachine {
-    // Estado
-    pub view: u64,
-    pub committed_height: u64,
-    pub voted_heights: HashMap<u64, (Hash, u64)>,
-    pub pending_blocks: HashMap<Hash, PendingBlock>,
-    
-    // Configuração
-    pub config: BftConfig,
-}
-
-impl BftStateMachine {
-    pub fn handle(&mut self, event: Event) -> Vec<Action> {
-        match event {
-            Event::ProposalTimer => self.on_proposal_timer(),
-            Event::BlockHeaderReceived { header, ... } => {
-                self.on_block_header(header, ...)
-            }
-            Event::BlockVoteReceived { vote } => {
-                self.on_block_vote(vote)
-            }
-            // ...
-        }
-    }
-}
+                 Root
+                 /   \
+                /     \
+               /       \
+              /         \
+             /           \
+            /             \
+           /               \
+          /                 \
+         /                   \
+        /                     \
+       /                       \
+      /                         \
+     /                           \
+    /                             \
+   /                               \
+  /                                 \
+ /                                   \
+Chave: 0110...1011
+Folha: (Chave, Valor)
 ```
 
 ### Benefícios
 
-| Benefício | Descrição |
-|-----------|-----------|
-| **Testável** | Sem dependências externas (sem network, storage, timers) |
-| **Determinístico** | Mesmo estado + evento = mesmas ações |
-| **Simulável** | Roda em simulação determinística |
-| **Debugável** | Trace completo de eventos |
-| **Replicável** | Mesma sequência de eventos = mesmos resultados |
+- **Raiz de Estado Única**: A raiz da JMT é um hash que representa de forma única todo o estado da aplicação. Qualquer mudança no estado resulta em uma nova raiz.
+- **Provas de Inclusão/Exclusão**: Pode-se provar criptograficamente que uma conta existe (ou não existe) no estado.
+- **Eficiência**: Otimizada para o padrão de acesso de blockchains, onde o estado é grande, mas apenas uma pequena parte é modificada em cada bloco.
 
-### Exemplo
+### Código Real
 
 ```rust
-#[test]
-fn test_consensus_advances() {
-    let mut state = BftStateMachine::new(config);
-    
-    // Evento 1: Proposal timer
-    let actions = state.handle(Event::ProposalTimer);
-    assert!(actions.contains(&Action::BuildProposal { ... }));
-    
-    // Evento 2: Block header received
-    let actions = state.handle(Event::BlockHeaderReceived { ... });
-    assert!(actions.contains(&Action::VerifyQcSignature { ... }));
-    
-    // Evento 3: QC formed
-    let actions = state.handle(Event::QcFormed { ... });
-    assert_eq!(state.committed_height, 1);
+// Arquivo: crates/executor/src/state.rs
+
+// O `State` envolve a JMT
+pub struct State<S: Storage> {
+    tree: JellyfishMerkleTree<S, Blake3Hasher>,
+    version: Version,
 }
-```
 
-### 🧠 Reflexão
-
-**Pergunta**: Se state machine é síncrono, como ele lida com I/O (network, storage)?
-
-**Resposta**: Não lida! State machine retorna **Actions** que descrevem o que fazer. Um executor externo executa as actions.
-
----
-
-## 4.2 Event Aggregator Pattern
-
-### Conceito
-
-Um **único task** processa eventos sequencialmente, sem mutex.
-
-```rust
-// Arquivo: crates/production/src/node.rs
-
-async fn run_state_machine(
-    mut state_machine: BftStateMachine,
-    mut event_rx: mpsc::Receiver<Event>,
-) {
-    loop {
-        // Receber evento
-        let event = event_rx.recv().await;
+impl<S: Storage> State<S> {
+    // Aplica um conjunto de escritas (key-value pairs) ao estado
+    pub fn apply(&mut self, writes: &[(Key, Option<Value>)]) -> Result<Hash> {
+        let (new_root, _tree_update) = self
+            .tree
+            .put_value_set(writes, self.version + 1)?;
         
-        // Processar (síncrono, sem contention)
-        let actions = state_machine.handle(event);
-        
-        // Executar actions (I/O)
-        for action in actions {
-            execute_action(action).await;
-        }
+        self.version += 1;
+        Ok(new_root)
     }
 }
 ```
 
-### Múltiplos Produtores
-
-```
-Network Task:
-├─ Recebe mensagens
-└─ Envia para event_rx
-
-Timer Task:
-├─ Aguarda timeout
-└─ Envia para event_rx
-
-Storage Task:
-├─ Lê/escreve dados
-└─ Envia para event_rx
-
-         ↓ (mpsc channel)
-
-Event Aggregator:
-├─ Processa eventos sequencialmente
-└─ Sem mutex, sem contention
-```
-
-### Benefício: Sem Race Conditions
-
-```
-Sem Event Aggregator (com mutex):
-├─ Network task tenta adquirir lock
-├─ Timer task tenta adquirir lock
-├─ Storage task tenta adquirir lock
-└─ Contention, deadlock risk
-
-Com Event Aggregator:
-├─ Network task envia evento
-├─ Timer task envia evento
-├─ Storage task envia evento
-└─ Event aggregator processa sequencialmente
-```
-
 ### 🧠 Reflexão
 
-**Pergunta**: Se event aggregator processa sequencialmente, não é lento?
+**Pergunta**: Como a `state_root` na `BlockHeader` se relaciona com a JMT?
 
-**Resposta**: Não! Porque cada evento é processado em microsegundos. Mesmo processando sequencialmente, você consegue processar milhares de eventos por segundo.
+**Resposta**: A `state_root` na `BlockHeader` é exatamente a raiz da JMT após a execução de todas as transações do bloco. Isso serve como uma prova criptográfica do novo estado do sistema.
 
 ---
 
-## 4.3 Thread Pool Specialization
+## 3.3 Execução de Transações
 
-### Conceito
+O `ExecutionState` é o componente responsável por gerenciar a JMT e executar as transações.
 
-Diferentes tipos de trabalho → diferentes thread pools.
+### Fluxo de Execução
 
-```rust
-// Arquivo: crates/production/src/thread_pools.rs
-
-pub struct ThreadPoolManager {
-    // Crypto pool: BLS verification, signature checks
-    crypto_pool: rayon::ThreadPool,
-    
-    // Execution pool: Radix Engine, merkle computation
-    execution_pool: rayon::ThreadPool,
-    
-    // I/O pool: tokio runtime for network/storage/timers
-    io_runtime: tokio::runtime::Runtime,
-}
-```
-
-### Dispatch
+1.  **Recebe Bloco Commitado**: O `NodeStateMachine` informa ao `ExecutionState` que um novo bloco foi commitado.
+2.  **Executa Transações**: O `ExecutionState` itera sobre as transações do bloco em ordem determinística.
+3.  **Calcula Efeitos**: Para cada transação, ele calcula as mudanças no estado (os `writes`).
+4.  **Aplica ao Estado**: Passa o conjunto de `writes` para o `State::apply`.
+5.  **Obtém Nova Raiz**: A JMT retorna a nova `state_root`.
+6.  **Verifica Consistência**: O `ExecutionState` compara a `state_root` calculada com a `state_root` na `BlockHeader` do bloco. Se forem iguais, a execução foi bem-sucedida.
 
 ```rust
-fn execute_action(&self, action: Action) {
-    match action {
-        Action::VerifyQcSignature { ... } => {
-            self.crypto_pool.spawn(|| verify_qc_signature(...));
-        }
-        Action::ExecuteTransaction { ... } => {
-            self.execution_pool.spawn(|| execute_transaction(...));
-        }
-        Action::SendMessage { ... } => {
-            self.io_runtime.spawn(async { send_message(...).await });
-        }
+// Lógica simplificada em crates/executor/src/state.rs
+
+fn execute_block(&mut self, block: &Block) -> Result<()> {
+    // 1. Coleta todas as transações do bloco
+    let transactions = block.all_transactions();
+    
+    // 2. Executa transações e coleta os writes
+    let mut all_writes = Vec::new();
+    for tx in transactions {
+        let writes = self.execute_transaction(tx)?;
+        all_writes.extend(writes);
     }
-}
-```
-
-### Configuração
-
-```rust
-let config = ThreadPoolConfig::auto();
-// Auto-detect cores:
-// - 25% crypto (BLS is CPU-intensive)
-// - 50% execution (Radix Engine is CPU-intensive)
-// - 25% I/O (network/storage is I/O-bound)
-
-// Ou customizar
-let config = ThreadPoolConfig::builder()
-    .crypto_threads(4)
-    .execution_threads(8)
-    .io_threads(2)
-    .pin_cores(true)  // Linux: pin threads to cores
-    .build()?;
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Por que separar crypto e execution pools?
-
-**Resposta**: Porque eles têm características diferentes:
-- **Crypto**: CPU-intensive, parallelizável (batch verification)
-- **Execution**: CPU-intensive, menos parallelizável (serial execution)
-- Separar permite otimizar cada um
-
----
-
-## 4.4 Batch Processing
-
-### Batch Verification
-
-```rust
-// Arquivo: crates/bft/src/vote_set.rs
-
-pub struct VoteSet {
-    verified_votes: Vec<(usize, BlockVote, u64)>,
-    unverified_votes: Vec<(usize, BlockVote, PublicKey, u64)>,
-    pending_verification: bool,
-}
-
-impl VoteSet {
-    pub fn try_build_qc(&mut self) -> Option<Action> {
-        // Se temos quorum de votos não verificados
-        if self.unverified_power >= quorum_threshold {
-            // Batch verify todos
-            return Some(Action::VerifyAndBuildQuorumCertificate {
-                votes: self.unverified_votes.clone(),
-                public_keys: self.collect_public_keys(),
-            });
-        }
-        None
+    
+    // 3. Aplica os writes à JMT
+    let calculated_state_root = self.state.apply(&all_writes)?;
+    
+    // 4. Verifica se a raiz calculada corresponde à do bloco
+    if calculated_state_root != block.header.state_root {
+        return Err(anyhow!("State root mismatch!"));
     }
+    
+    Ok(())
 }
-```
-
-### Benefício
-
-```
-Sem batch verification:
-- Voto 1 chega: Verifica (10ms)
-- Voto 2 chega: Verifica (10ms)
-- Voto 3 chega: Verifica (10ms)
-- Total: 30ms
-
-Com batch verification:
-- Voto 1 chega: Buffer
-- Voto 2 chega: Buffer
-- Voto 3 chega: Quorum! Batch verify (15ms)
-- Total: 15ms
-
-Economia: 50%! 🎉
 ```
 
 ### 🧠 Reflexão
 
-**Pergunta**: Por que batch verification é mais rápido?
+**Pergunta**: O que acontece se a `state_root` não corresponder? Isso pode acontecer em um sistema funcionando corretamente?
 
-**Resposta**: Porque BLS12-381 batch verification usa operações parallelizáveis. Verificar 3 assinaturas em paralelo é mais rápido que verificar sequencialmente.
-
----
-
-## 4.5 Deterministic Simulation
-
-### Conceito
-
-Simular consenso em ambiente determinístico para testes.
-
-```rust
-// Arquivo: crates/simulation/src/runner.rs
-
-pub struct SimulationRunner {
-    // Event queue ordenado por: (time, priority, node, sequence)
-    event_queue: BTreeMap<EventKey, Event>,
-    
-    // Nodes (in-process)
-    nodes: Vec<BftStateMachine>,
-    
-    // Storage (in-memory)
-    storage: SimStorage,
-    
-    // Network (simulated latency)
-    network: SimulatedNetwork,
-}
-
-impl SimulationRunner {
-    pub fn run_until(&mut self, duration: Duration) {
-        while self.current_time < duration {
-            let event = self.event_queue.pop_first();
-            let actions = self.nodes[event.node].handle(event);
-            
-            for action in actions {
-                self.execute_action(action);
-            }
-        }
-    }
-}
-```
-
-### Uso
-
-```rust
-#[test]
-fn test_consensus_with_latency() {
-    let config = NetworkConfig {
-        num_shards: 2,
-        validators_per_shard: 4,
-        intra_shard_latency: Duration::from_millis(10),
-        cross_shard_latency: Duration::from_millis(50),
-    };
-    
-    let mut runner = SimulationRunner::new(config, seed=42);
-    runner.initialize_genesis();
-    runner.run_until(Duration::from_secs(10));
-    
-    // Verificar resultados
-    assert_eq!(runner.committed_height(), 100);
-    assert_eq!(runner.view_changes(), 0);
-}
-```
-
-### Determinismo
-
-```
-Seed 42:
-├─ Run 1: committed_height = 100, view_changes = 0
-├─ Run 2: committed_height = 100, view_changes = 0
-└─ Run 3: committed_height = 100, view_changes = 0
-
-Seed 43:
-├─ Run 1: committed_height = 98, view_changes = 1
-├─ Run 2: committed_height = 98, view_changes = 1
-└─ Run 3: committed_height = 98, view_changes = 1
-```
-
-### 🧠 Reflexão
-
-**Pergunta**: Se simulação é determinística, como testa comportamento com falhas aleatórias?
-
-**Resposta**: Usa seed diferente! Seed controla qual nó falha, quando falha, etc. Diferentes seeds = diferentes cenários.
+**Resposta**: Em um sistema com validadores honestos, isso **nunca deveria acontecer**. Uma `state_root` que não corresponde indica um **bug crítico** no protocolo de consenso ou na lógica de execução, ou um **proponente malicioso** que criou um bloco inválido. Um validador honesto rejeitaria tal bloco.
 
 ---
 
-## ✅ Checkpoint 4: Produção
+## ✅ Checkpoint 3: Execução e Estado
 
 Você agora entende:
-- ✅ State machine pattern
-- ✅ Event aggregator pattern
-- ✅ Thread pool specialization
-- ✅ Batch processing
-- ✅ Deterministic simulation
+- ✅ A necessidade de execução determinística.
+- ✅ Como a Jellyfish Merkle Tree (JMT) é usada para representar o estado.
+- ✅ O fluxo de execução de transações e a verificação da `state_root`.
+
+**Próximo**: O ciclo de vida completo de uma transação, do início ao fim.
 
 ---
 
-# 🎯 Conclusão: Tudo Junto
+# 📚 Módulo 4: O Ciclo de Vida de uma Transação
 
-## Fluxo Completo (Exemplo Prático)
+## 4.1 Do Cliente ao Mempool
 
-```
-1. USUÁRIO submete transação
-   └─ Event: SubmitTransaction
-
-2. MEMPOOL recebe transação
-   └─ Armazena em mempool
-
-3. PROPOSER (V0) timeout
-   └─ Event: ProposalTimer
-   └─ Action: BuildProposal
-
-4. BUILDER computa state_root
-   └─ Executa certificados
-   └─ Computa merkle root
-   └─ Action: BroadcastBlockHeader
-
-5. VALIDADORES (V1, V2, V3) recebem header
-   └─ Event: BlockHeaderReceived
-   └─ Validam header
-   └─ Aguardam dados
-   └─ Action: FetchTransactions
-
-6. DADOS chegam via gossip
-   └─ Bloco completo
-   └─ Action: VerifyQcSignature (async)
-
-7. QC VERIFICADO (callback)
-   └─ Verificam state_root (async)
-   └─ Action: VerifyStateRoot (async)
-
-8. STATE_ROOT VERIFICADO (callback)
-   └─ Criam BlockVote
-   └─ Assinam com BLS
-   └─ Action: SendBlockVote
-
-9. PROPOSER (V0) recebe votos
-   └─ Event: BlockVoteReceived (3x)
-   └─ Agrega assinaturas
-   └─ Action: VerifyAndBuildQuorumCertificate (async, batch)
-
-10. QC FORMADO (callback)
-    └─ Broadcast QC
-    └─ Bloco em height 0 COMMITADO (two-chain rule)
-    └─ Event: QcFormed
-
-11. EXECUTION coordena
-    └─ Executa bloco commitado
-    └─ Gera StateProvisions (cross-shard)
-    └─ Atualiza JMT
-
-12. PRÓXIMO ROUND
-    └─ Proposer muda
-    └─ Consenso avança
-```
-
-## Conceitos Aprendidos
-
-| Conceito | Por que Importa |
-|----------|-----------------|
-| **Blake3 Hashing** | Prova integridade de dados |
-| **Merkle Trees** | Prova inclusão de transações |
-| **BLS12-381** | Assinaturas agregáveis (compressão) |
-| **Domain Separation** | Previne replay attacks |
-| **Vote Locking** | Garante segurança (safety) |
-| **Unlock Rule** | Garante liveness (consenso avança) |
-| **Two-Chain Rule** | Finality em 2 rounds |
-| **State Root Verification** | Valida execução |
-| **CommitmentProof** | Prova cross-shard execution |
-| **Cycle Detection** | Previne deadlock |
-| **State Machine Pattern** | Testabilidade e determinismo |
-| **Event Aggregator** | Sem race conditions |
-| **Thread Pool Specialization** | Performance |
-| **Batch Processing** | Compressão de I/O |
-| **Deterministic Simulation** | Testes confiáveis |
-
-## Próximos Passos (Opcional)
-
-1. **Ler o código real**: Comece por `crates/types/src/` (tipos)
-2. **Entender BFT**: Leia `crates/bft/src/state.rs` (consenso)
-3. **Estudar Execution**: Leia `crates/execution/src/` (execução)
-4. **Rodar Testes**: `cargo test --all` (validar compreensão)
-5. **Simular**: Rode `crates/simulation/tests/` (ver em ação)
-
-## Recursos Recomendados
-
-- **HotStuff Paper**: https://arxiv.org/abs/1803.05069
-- **BLS12-381**: https://electriccoin.co/blog/bls12-381-zk-proofs/
-- **Merkle Trees**: https://en.wikipedia.org/wiki/Merkle_tree
-- **Two-Phase Commit**: https://en.wikipedia.org/wiki/Two-phase_commit_protocol
+1.  **Criação**: Um cliente (ex: uma carteira) cria uma transação, a assina com sua chave privada e a envia para um nó da rede Hyperscale.
+2.  **Recepção no Nó**: O nó recebe a transação via RPC.
+3.  **Validação Básica**: O nó realiza verificações básicas:
+    - A assinatura é válida?
+    - O formato está correto?
+    - O remetente tem saldo suficiente (verificação rápida, não garantida)?
+4.  **Envio ao Mempool**: Se a validação básica passar, a transação é enviada para o `Mempool`.
 
 ---
 
-**Parabéns! Você agora entende os fundamentos de consenso distribuído, criptografia e padrões de produção através do Hyperscale-RS!** 🎉
+## 4.2 A Vida no Mempool
 
+O `Mempool` é a "sala de espera" para transações que ainda não foram incluídas em um bloco. Sua principal responsabilidade é fornecer um conjunto de transações válidas e prontas para o proponente do próximo bloco.
+
+### Estados de uma Transação no Mempool
+
+- **Pending**: A transação acabou de chegar. O Mempool ainda não a processou totalmente.
+- **Ready**: A transação foi validada e está pronta para ser incluída em um bloco.
+- **Committed**: A transação foi incluída em um bloco que foi **commitado** (mas ainda não executado).
+- **Executed**: A transação foi executada com sucesso.
+- **Aborted**: A transação foi abortada (ex: por um conflito que não pôde ser resolvido).
+- **Deferred**: A transação perdeu uma disputa de conflito e está temporariamente "adiada" até que a transação vencedora seja executada.
+
+### Detecção de Conflitos
+
+O Mempool usa um `DependencyGraph` para rastrear quais transações acessam quais partes do estado (quais "nós" da JMT). Se duas transações tentam modificar o mesmo nó de estado, há um conflito.
+
+- **Resolução**: O Mempool escolhe um vencedor (geralmente com base na taxa de gás ou outra heurística) e marca o perdedor como `Deferred`.
+- **Retentativa**: Uma vez que a transação vencedora é executada, a transação `Deferred` é movida de volta para o estado `Pending` para ser reavaliada.
+
+```rust
+// Lógica simplificada em crates/mempool/src/state.rs
+
+fn process_new_transactions(&mut self) {
+    for tx in self.pending_transactions.drain(..) {
+        // Constrói o grafo de dependências
+        let dependencies = self.dependency_graph.get_dependencies(&tx);
+        
+        if self.has_conflict(dependencies) {
+            // Resolve o conflito, marca um como Deferred
+            self.handle_conflict(tx);
+        } else {
+            // Sem conflitos, move para Ready
+            self.ready_transactions.push(tx);
+        }
+    }
+}
+```
+
+---
+
+## 4.3 Da Proposta à Execução
+
+1.  **Proposta de Bloco**: O `BftState` (líder atual) solicita ao `Mempool` um lote de transações `Ready`.
+2.  **Inclusão no Bloco**: O líder inclui essas transações em um novo bloco e o transmite.
+3.  **Consenso**: O bloco passa pelo processo de consenso do HotStuff-2 (votação, QC, commit).
+4.  **Notificação de Commit**: O `NodeStateMachine` recebe a notificação de que o bloco foi commitado.
+5.  **Notificação ao Mempool**: O `NodeStateMachine` informa ao `Mempool` que as transações no bloco foram commitadas. O Mempool atualiza o estado dessas transações para `Committed`.
+6.  **Execução**: O `NodeStateMachine` envia o bloco para o `ExecutionState`.
+7.  **Execução e Atualização de Estado**: O `ExecutionState` executa as transações e atualiza a JMT.
+8.  **Notificação de Execução**: O `ExecutionState` informa ao `NodeStateMachine` o resultado da execução.
+9.  **Notificação Final ao Mempool**: O `NodeStateMachine` informa ao `Mempool` que as transações foram `Executed` (ou `Aborted`). O Mempool pode então limpar quaisquer dados relacionados a essas transações finalizadas.
+
+### Diagrama de Sequência Simplificado
+
+```
+Cliente -> Nó -> Mempool -> BFT (Líder) -> BFT (Validadores) -> NodeStateMachine -> ExecutionState
+   |        |       | (Ready)      | (Proposta)        | (Votos)           | (Commit)           | (Execução)
+   |        |       |              |                   |                   |                    |
+   |        |       └──────────────|-------------------|-------------------> Notifica Mempool (Committed)
+   |        |                      |                   |                   |                    |
+   |        └──────────────────────|-------------------|-------------------|--------------------> Notifica Mempool (Executed)
+```
+
+---
+
+## ✅ Checkpoint 4: Ciclo de Vida Completo
+
+Parabéns! Você rastreou uma transação desde sua criação até sua execução final. Você agora tem uma visão completa de como os principais componentes do Hyperscale-rs trabalham juntos.
+
+### O que você aprendeu:
+- Como uma transação entra no sistema.
+- O papel do Mempool na validação e resolução de conflitos.
+- Como os diferentes componentes (`Mempool`, `BftState`, `ExecutionState`, `NodeStateMachine`) se comunicam para mover uma transação através do sistema.
+
+## 🚀 Próximos Passos
+
+Com esta base sólida, você está pronto para explorar tópicos mais avançados no código do Hyperscale-rs:
+
+- **Execução Cross-Shard**: Como as transações que abrangem múltiplos shards são coordenadas?
+- **Recuperação de Falhas**: O que acontece quando um nó reinicia?
+- **Otimizações de Rede**: Como o gossip e a comunicação de rede são gerenciados?
+
+Boa exploração!
+'''

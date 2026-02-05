@@ -1,0 +1,63 @@
+graph TD
+    A["🚀 Block Committed<br/>Ready for Execution"] --> B["📋 Categorize Transactions<br/>1. Retry (high priority)<br/>2. Priority (CommitmentProof)<br/>3. Normal"]
+    
+    B --> C["🟢 Execute Retry Transactions<br/>Failed in previous blocks"]
+    C --> D["📊 Detect Conflicts<br/>DependencyGraph"]
+    
+    D --> E{"Conflict<br/>Detected?"}
+    
+    E -->|No| F["✅ Execute Successfully<br/>Update State"]
+    E -->|Yes| G["🔁 Livelock Check<br/>Cycle Detection"]
+    
+    G --> H{"Cycle<br/>Detected?"}
+    
+    H -->|No| I["⚙️ Resolve Conflict<br/>Choose winner"]
+    I --> J["🟡 Defer Loser<br/>Retry in next block"]
+    J --> F
+    
+    H -->|Yes| K["🚨 Cycle Found<br/>Deadlock Prevention"]
+    K --> L["⏸️ Defer Transaction<br/>Queue for retry"]
+    L --> F
+    
+    F --> M["🟢 Execute Priority Transactions<br/>With CommitmentProof"]
+    M --> N["🔗 Cross-Shard Coordination<br/>Verify CommitmentProof"]
+    N --> O{"Proof<br/>Valid?"}
+    
+    O -->|No| P["❌ Reject<br/>Invalid proof"]
+    P --> M
+    
+    O -->|Yes| Q["✅ Execute<br/>Update State"]
+    Q --> R["🟢 Execute Normal Transactions<br/>Standard execution"]
+    R --> S["⚙️ Apply Writes<br/>Update Jellyfish Merkle Tree"]
+    
+    S --> T["📊 Detect Conflicts<br/>DependencyGraph"]
+    T --> U{"Conflict?"}
+    
+    U -->|No| V["✅ Execute Successfully"]
+    U -->|Yes| W["🔁 Livelock Check"]
+    
+    W --> X{"Cycle?"}
+    X -->|No| Y["⚙️ Resolve Conflict"]
+    X -->|Yes| Z["⏸️ Defer"]
+    
+    Y --> V
+    Z --> V
+    
+    V --> AA["💾 Calculate State Root<br/>JMT Root Hash"]
+    AA --> AB{"State Root<br/>Matches?"}
+    
+    AB -->|No| AC["❌ Execution Error<br/>State mismatch"]
+    AB -->|Yes| AD["✅ Block Finalized<br/>State committed"]
+    
+    AD --> AE["📋 Update Mempool<br/>- Remove executed<br/>- Retry deferred<br/>- Remove aborted"]
+    AE --> AF["🏁 Execution Complete"]
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style B fill:#4dabf7,stroke:#1971c2,color:#fff
+    style C fill:#51cf66,stroke:#2f9e44,color:#fff
+    style M fill:#51cf66,stroke:#2f9e44,color:#fff
+    style R fill:#51cf66,stroke:#2f9e44,color:#fff
+    style G fill:#da77f2,stroke:#9c36b5,color:#fff
+    style K fill:#da77f2,stroke:#9c36b5,color:#fff
+    style W fill:#da77f2,stroke:#9c36b5,color:#fff
+    style AD fill:#51cf66,stroke:#2f9e44,color:#fff

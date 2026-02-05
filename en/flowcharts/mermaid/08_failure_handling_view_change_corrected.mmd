@@ -1,0 +1,48 @@
+graph TD
+    A["⏱️ Round Timeout<br/>Leader Does Not Propose"] --> B["🚨 Detect Failure<br/>Waited X seconds"]
+    B --> C["🔓 Unlock Vote<br/>Remove Vote Locks"]
+    C --> D["➕ Increment View<br/>View += 1<br/>Round += 1"]
+    D --> E["👑 New Leader<br/>Leader = Validator[Round % N]"]
+    E --> F{"New Leader<br/>Honest?"}
+    
+    F -->|No| G["⏱️ Timeout Again<br/>Repeat View Change"]
+    G --> D
+    
+    F -->|Yes| H["📝 New Leader Proposes<br/>Block with HighQC"]
+    H --> I["🔄 Synchronization<br/>Nodes Receive Proposal"]
+    I --> J["✅ Validate Block<br/>- Signature<br/>- Merkle Root<br/>- State Root"]
+    
+    J -->|Invalid| K["❌ Reject<br/>New Timeout"]
+    K --> D
+    
+    J -->|Valid| L["🔒 Check Vote Lock<br/>voted_heights[Height]?"]
+    
+    L -->|Locked| M["🚫 Cannot Vote<br/>Already locked"]
+    M --> K
+    
+    L -->|Not Locked| N["🗳️ Vote on Block"]
+    N --> O["📊 Collect Votes<br/>2f+1 Required"]
+    O --> P{"Quorum<br/>Reached?"}
+    
+    P -->|No| Q["⏳ Wait for More Votes"]
+    Q --> K
+    
+    P -->|Yes| R["✍️ Aggregate Signatures<br/>BLS12-381 Aggregation"]
+    R --> S["🎖️ Create QC<br/>QC(Height, Round)"]
+    S --> T["📡 Broadcast QC<br/>Send to all nodes"]
+    
+    T --> U["📥 Nodes Receive QC"]
+    U --> V["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
+    V --> W["🔓 Unlock Votes<br/>Remove locks ≤ QC.height"]
+    
+    W --> X["✅ System Recovers<br/>Consensus Restored"]
+    X --> Y["🏁 Back to Normal<br/>Continue Consensus"]
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style C fill:#ffd43b,stroke:#f59f00,color:#000
+    style D fill:#ffd43b,stroke:#f59f00,color:#000
+    style E fill:#51cf66,stroke:#2f9e44,color:#fff
+    style H fill:#4dabf7,stroke:#1971c2,color:#fff
+    style V fill:#ffd43b,stroke:#f59f00,color:#000
+    style W fill:#ffd43b,stroke:#f59f00,color:#000
+    style X fill:#51cf66,stroke:#2f9e44,color:#fff

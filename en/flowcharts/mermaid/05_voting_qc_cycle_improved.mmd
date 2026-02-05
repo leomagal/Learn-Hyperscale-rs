@@ -1,0 +1,56 @@
+graph TD
+    A["📝 Block Proposed<br/>Block(Height, Round, Txs)"] --> B["📥 Node Receives Proposal"]
+    B --> C["✅ Validate Block<br/>- Leader Signature<br/>- Merkle Root<br/>- State Root<br/>- Parent QC"]
+    
+    C -->|Invalid| D["❌ Reject<br/>Does not vote"]
+    D --> E["End"]
+    
+    C -->|Valid| F["🔒 Verify Vote Lock<br/>Check: QC.Round > Locked.Round?"]
+    
+    F -->|No| G["✅ Lock is Valid<br/>Can vote"]
+    F -->|Yes| H["🔓 Lock Expired<br/>Can vote"]
+    
+    G --> I["🗳️ Create Vote<br/>Vote(Block, Validator, Sig)"]
+    H --> I
+    
+    I --> J["📢 Broadcast Vote<br/>Send to all nodes"]
+    J --> K["📊 Vote Collection<br/>VoteSet at Leader"]
+    K --> L{"2f+1 Votes<br/>Received?"}
+    
+    L -->|No| M["⏳ Wait for More Votes"]
+    M --> N{"Timeout?"}
+    N -->|Yes| O["⏱️ Skip to Next Round"]
+    N -->|No| M
+    
+    L -->|Yes| P["✍️ Batch Verification<br/>Verify all votes"]
+    P -->|Fail| Q["❌ Reject Votes<br/>Invalid signatures"]
+    Q --> O
+    
+    P -->|Success| R["🔗 Aggregate Signatures<br/>BLS12-381 Aggregation"]
+    R --> S["🎖️ Create Quorum Certificate<br/>QC(Block, Signers, AggSig)"]
+    S --> T["📡 Broadcast QC<br/>Send to all nodes"]
+    
+    T --> U["📥 Nodes Receive QC"]
+    U --> V["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
+    V --> W["🔓 Unlock Votes<br/>Remove locks for h ≤ QC.height"]
+    
+    W --> X{"Two-Chain Rule?<br/>QC.parent_qc exists?"}
+    
+    X -->|No| Y["⏳ Wait for Next QC"]
+    Y --> O
+    
+    X -->|Yes| Z["✅ Block Committed<br/>Two-chain rule satisfied"]
+    Z --> AA["⚙️ Execute Transactions<br/>Update State Root"]
+    AA --> AB["💾 Block Finalized"]
+    AB --> AC["🏁 End"]
+    
+    O --> AC
+    E --> AC
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style F fill:#a78bfa,stroke:#7c3aed,color:#fff
+    style I fill:#4dabf7,stroke:#1971c2,color:#fff
+    style S fill:#51cf66,stroke:#2f9e44,color:#fff
+    style V fill:#ffd43b,stroke:#f59f00,color:#000
+    style W fill:#ffd43b,stroke:#f59f00,color:#000
+    style Z fill:#51cf66,stroke:#2f9e44,color:#fff

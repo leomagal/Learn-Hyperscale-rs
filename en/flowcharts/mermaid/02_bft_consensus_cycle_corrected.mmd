@@ -1,0 +1,62 @@
+graph TD
+    A["🚀 Epoch Start<br/>Epoch = N"] --> B["Round = 0"]
+    B --> C["👑 Leader Election<br/>Leader = Validator[Round % N]"]
+    C --> D["🔗 Leader Proposes Block<br/>Block(Height, Round, Txs)"]
+    D --> E["📥 Nodes Receive Proposal"]
+    E --> F["✅ Block Validation<br/>- Leader Signature<br/>- Merkle Root<br/>- State Root<br/>- Parent QC"]
+    
+    F -->|Invalid| G["❌ Reject Block"]
+    G --> H["⏱️ Timeout<br/>Waiting for valid block"]
+    
+    F -->|Valid| I["🔒 Check Vote Lock<br/>voted_heights.contains_key(height)?"]
+    
+    I -->|Already Voted| J["🚫 Cannot Vote<br/>Already locked on different block"]
+    J --> H
+    
+    I -->|Not Voted| K["🗳️ Node Votes on Block<br/>Vote(Block, Validator, Sig)"]
+    K --> L["📢 Broadcast Vote<br/>Send to all"]
+    
+    L --> M["📊 Vote Collection<br/>VoteSet accumulates votes"]
+    M --> N{"2f+1 Votes<br/>Received?"}
+    
+    N -->|No| O["⏱️ Timeout<br/>Waiting for more votes"]
+    O --> P["🔄 Skip to Next Round<br/>Round += 1"]
+    P --> C
+    
+    N -->|Yes| Q["✍️ Signature Aggregation<br/>BLS12-381 Aggregation"]
+    Q --> R["🎖️ Create Quorum Certificate<br/>QC(Block, Signers, AggSig)"]
+    R --> S["📡 Broadcast QC<br/>Send to all nodes"]
+    
+    S --> T["📥 Nodes Receive QC"]
+    T --> U["🔄 Sync View<br/>if QC.round > local.view:<br/>  local.view = QC.round"]
+    U --> V["🔓 Unlock Vote<br/>Remove locks for heights ≤ QC.height"]
+    
+    V --> W{"Two-Chain Rule?<br/>QC.parent_qc exists?"}
+    
+    W -->|No| X["⏳ Wait for Next QC"]
+    X --> P
+    
+    W -->|Yes| Y["✅ Block Committed!<br/>Two-chain rule satisfied"]
+    Y --> Z["⚙️ Execute Transactions<br/>Update State Root"]
+    Z --> AA["💾 Finalize Block"]
+    
+    AA --> AB{"Epoch End?<br/>Blocks >= Threshold"}
+    
+    AB -->|No| AC["🔄 Next Round<br/>Round += 1"]
+    AC --> C
+    
+    AB -->|Yes| AD["🎉 New Epoch<br/>Epoch += 1<br/>Round = 0"]
+    AD --> A
+    
+    H --> AE["⏱️ View Change Timer<br/>Timeout X seconds"]
+    AE --> AF["🔓 Unlock Vote<br/>Remove all locks"]
+    AF --> AG["➕ Increment View<br/>View += 1<br/>Round += 1"]
+    AG --> C
+    
+    style A fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style Y fill:#51cf66,stroke:#2f9e44,color:#fff
+    style R fill:#4dabf7,stroke:#1971c2,color:#fff
+    style U fill:#ffd43b,stroke:#f59f00,color:#000
+    style V fill:#ffd43b,stroke:#f59f00,color:#000
+    style I fill:#a78bfa,stroke:#7c3aed,color:#fff
+    style J fill:#ff8787,stroke:#fa5252,color:#fff
