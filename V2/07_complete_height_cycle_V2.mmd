@@ -1,0 +1,63 @@
+graph TD
+    Start["🚀 Height H Start"]
+    Round0["🌟 Round 0<br/>view = 0"]
+    Propose0["📝 Propose Block B0"]
+    Vote0["🗳️ Vote for B0<br/>Lock: voted_heights[H] = B0"]
+    Timeout0["⏱️ Timeout<br/>No QC formed"]
+    CheckQC0{"QC at height H?"}
+    ClearLock0["🔓 Clear Vote Lock<br/>voted_heights[H] = None"]
+    Round1["🌟 Round 1<br/>view = 1"]
+    Propose1["📝 Propose Block B1<br/>Different from B0"]
+    Vote1["🗳️ Vote for B1<br/>Lock: voted_heights[H] = B1"]
+    Timeout1["⏱️ Timeout<br/>No QC formed"]
+    CheckQC1{"QC at height H?"}
+    ClearLock1["🔓 Clear Vote Lock<br/>voted_heights[H] = None"]
+    Round2["🌟 Round 2<br/>view = 2"]
+    Propose2["📝 Propose Block B2"]
+    Vote2["🗳️ Vote for B2<br/>Lock: voted_heights[H] = B2"]
+    QuorumReached["✅ Quorum Reached!"]
+    CreateQC["🎖️ Create QC<br/>latest_qc.height = H"]
+    ViewSync["🌟 View Sync"]
+    CheckQCHeight{"QC Height >= H?"}
+    KeepLock["🔒 Keep Vote Lock<br/>voted_heights[H] = B2"]
+    CommitCheck{"Two-Chain Rule?"}
+    Execute["⚡ Execute Transactions"]
+    NextHeight["🚀 Height H+1 Start"]
+    
+    Start --> Round0
+    Round0 --> Propose0
+    Propose0 --> Vote0
+    Vote0 --> Timeout0
+    Timeout0 --> CheckQC0
+    CheckQC0 -->|No QC| ClearLock0
+    ClearLock0 --> Round1
+    Round1 --> Propose1
+    Propose1 --> Vote1
+    Vote1 --> Timeout1
+    Timeout1 --> CheckQC1
+    CheckQC1 -->|No QC| ClearLock1
+    ClearLock1 --> Round2
+    Round2 --> Propose2
+    Propose2 --> Vote2
+    Vote2 --> QuorumReached
+    QuorumReached --> CreateQC
+    CreateQC --> ViewSync
+    ViewSync --> CheckQCHeight
+    CheckQCHeight -->|Yes| KeepLock
+    KeepLock --> CommitCheck
+    CommitCheck -->|Yes| Execute
+    Execute --> NextHeight
+    
+    style Start fill:#ff6b6b
+    style Round0 fill:#ffd43b
+    style Round1 fill:#ffd43b
+    style Round2 fill:#ffd43b
+    style Vote0 fill:#da77f2
+    style Vote1 fill:#da77f2
+    style Vote2 fill:#da77f2
+    style ClearLock0 fill:#da77f2
+    style ClearLock1 fill:#da77f2
+    style KeepLock fill:#da77f2
+    style CreateQC fill:#51cf66
+    style Execute fill:#ffd43b
+    style NextHeight fill:#ff6b6b

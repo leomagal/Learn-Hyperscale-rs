@@ -1,0 +1,71 @@
+graph TD
+    Start["🚀 Normal Operation"]
+    Timeout["⏱️ Timeout<br/>No QC formed"]
+    FailureDetect["❌ Failure Detected<br/>Round R failed"]
+    CheckQCHeight{"QC at height H?<br/>latest_qc.height < H"}
+    ClearVoteLock["🔓 Clear Vote Lock<br/>voted_heights[H] = None"]
+    KeepVoteLock["🔒 Keep Vote Lock<br/>voted_heights[H] = B"]
+    ViewIncrement["🌟 Increment View<br/>view = R+1"]
+    LeaderElection["👑 New Leader Election<br/>for view R+1"]
+    IsNewLeader{"Are we<br/>new leader?"}
+    ReproposeLocked["📝 Re-propose Locked Block<br/>voted_heights[H] = B"]
+    ProposeNew["📝 Propose New Block<br/>voted_heights[H] = None"]
+    BroadcastProposal["📊 Broadcast Proposal"]
+    NodesReceive["📍 Nodes Receive Proposal"]
+    ValidateProposal["✅ Validate Proposal"]
+    CheckVoteLock{"🔒 Check Vote Lock<br/>voted_heights[H]?"}
+    CanVote{"Can Vote?"}
+    Vote["🗳️ Create Vote"]
+    BroadcastVote["📊 Broadcast Vote"]
+    CollectVotes["📊 Collect Votes"]
+    QuorumCheck{"Quorum?"}
+    CreateQC["🎖️ Create QC"]
+    ViewSync["🌟 View Sync"]
+    CommitCheck{"Two-Chain Rule?"}
+    Execute["⚡ Execute Transactions"]
+    Recovered["✅ System Recovered"]
+    
+    Start --> Timeout
+    Timeout --> FailureDetect
+    FailureDetect --> CheckQCHeight
+    CheckQCHeight -->|No QC| ClearVoteLock
+    CheckQCHeight -->|QC formed| KeepVoteLock
+    ClearVoteLock --> ViewIncrement
+    KeepVoteLock --> ViewIncrement
+    ViewIncrement --> LeaderElection
+    LeaderElection --> IsNewLeader
+    IsNewLeader -->|Yes| ReproposeLocked
+    IsNewLeader -->|No| BroadcastProposal
+    ReproposeLocked --> BroadcastProposal
+    ProposeNew --> BroadcastProposal
+    BroadcastProposal --> NodesReceive
+    NodesReceive --> ValidateProposal
+    ValidateProposal --> CheckVoteLock
+    CheckVoteLock -->|Locked| CanVote
+    CheckVoteLock -->|Not Locked| Vote
+    CanVote -->|Same block| Vote
+    CanVote -->|Different block| BroadcastVote
+    Vote --> BroadcastVote
+    BroadcastVote --> CollectVotes
+    CollectVotes --> QuorumCheck
+    QuorumCheck -->|Yes| CreateQC
+    QuorumCheck -->|No| Timeout
+    CreateQC --> ViewSync
+    ViewSync --> CommitCheck
+    CommitCheck -->|Yes| Execute
+    CommitCheck -->|No| Timeout
+    Execute --> Recovered
+    
+    style Start fill:#ff6b6b
+    style Timeout fill:#ff6b6b
+    style FailureDetect fill:#ff6b6b
+    style ClearVoteLock fill:#da77f2
+    style KeepVoteLock fill:#da77f2
+    style ViewIncrement fill:#ffd43b
+    style LeaderElection fill:#4c6ef5
+    style ReproposeLocked fill:#4c6ef5
+    style ProposeNew fill:#4c6ef5
+    style Vote fill:#51cf66
+    style CreateQC fill:#51cf66
+    style Execute fill:#ffd43b
+    style Recovered fill:#51cf66

@@ -1,0 +1,68 @@
+graph TD
+    Start["🚀 Epoch Start"]
+    RoundStart["🌟 Round Start<br/>view = R"]
+    LeaderElect["👑 Leader Election<br/>for height H"]
+    Proposal["📝 Leader Proposes Block<br/>at height H, round R"]
+    Receive["📍 Nodes Receive Proposal"]
+    Validate["✅ Validate Block"]
+    CheckVoteLock{"🔒 Check Vote Lock<br/>voted_heights[H]?"}
+    AlreadyVoted["Already Voted<br/>Cannot Vote"]
+    CreateVote["🗳️ Create & Sign Vote"]
+    Broadcast["📊 Broadcast Vote"]
+    Collect["📊 Collect Votes"]
+    QuorumCheck{"🎖️ Quorum Check<br/>2f+1 votes?"}
+    NoQuorum["❌ No Quorum<br/>Start Timeout"]
+    Aggregate["📊 Aggregate Signatures"]
+    CreateQC["🎖️ Create QC"]
+    ViewSync["🌟 View Sync<br/>Update local view"]
+    CheckQCHeight{"Check QC Height<br/>vs Current Height?"}
+    ClearVoteLock["🔓 Clear Vote Lock<br/>for height H"]
+    KeepVoteLock["🔒 Keep Vote Lock<br/>for height H"]
+    CommitCheck{"Two-Chain Rule?"}
+    NoCommit["❌ No Commit"]
+    Execute["⚡ Execute Transactions"]
+    Finalize["🏁 Finalize State"]
+    RoundAdvance["🔄 Round Advances<br/>view = R+1"]
+    
+    Start --> RoundStart
+    RoundStart --> LeaderElect
+    LeaderElect --> Proposal
+    Proposal --> Receive
+    Receive --> Validate
+    Validate --> CheckVoteLock
+    CheckVoteLock -->|Already Voted| AlreadyVoted
+    CheckVoteLock -->|Not Voted| CreateVote
+    AlreadyVoted --> RoundAdvance
+    CreateVote --> Broadcast
+    Broadcast --> Collect
+    Collect --> QuorumCheck
+    QuorumCheck -->|No| NoQuorum
+    QuorumCheck -->|Yes| Aggregate
+    Aggregate --> CreateQC
+    CreateQC --> ViewSync
+    ViewSync --> CheckQCHeight
+    CheckQCHeight -->|QC Height >= Current| KeepVoteLock
+    CheckQCHeight -->|QC Height < Current| ClearVoteLock
+    KeepVoteLock --> CommitCheck
+    ClearVoteLock --> CommitCheck
+    CommitCheck -->|Yes| Execute
+    CommitCheck -->|No| NoCommit
+    NoCommit --> RoundAdvance
+    Execute --> Finalize
+    Finalize --> RoundAdvance
+    NoQuorum --> RoundAdvance
+    RoundAdvance --> RoundStart
+    
+    style Start fill:#ff6b6b
+    style RoundStart fill:#ffd43b
+    style LeaderElect fill:#4c6ef5
+    style Proposal fill:#4c6ef5
+    style CheckVoteLock fill:#da77f2
+    style CreateVote fill:#51cf66
+    style CreateQC fill:#51cf66
+    style ViewSync fill:#ffd43b
+    style ClearVoteLock fill:#da77f2
+    style KeepVoteLock fill:#da77f2
+    style Execute fill:#ffd43b
+    style Finalize fill:#51cf66
+    style RoundAdvance fill:#4c6ef5
